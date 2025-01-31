@@ -29,7 +29,7 @@ export const housekeeping: Action = {
 
       //TODO:
 
-      //run in loop and call
+      // run in loop and call
       // await runtime.callAction("SECOND_ACTION", { someData: "data" });
       // also eigentlich sollte es dann reichen hier analyzeData aufzurufen und dann checkSell
       // keine Ahnung ob das so geht lol...

@@ -24,7 +24,6 @@
     "@elizaos/plugin-node": "0.1.7",
     "@elizaos/plugin-solana": "0.1.7",
     "@elizaos/plugin-starknet": "0.1.7",
-    "@elizaos/plugin-trustdb": "0.1.8-alpha.1",
     "@tavily/core": "0.0.2",
     "agent-twitter-client": "^0.0.18",
     "amqplib": "0.10.5",
@@ -35,6 +34,7 @@
     "readline": "1.3.0",
     "telegram": "^2.26.16",
     "url": "0.11.4",
+    "uuid": "^11.0.5",
     "ws": "8.18.0",
     "yargs": "17.7.2",
     "zod": "^3.24.1"

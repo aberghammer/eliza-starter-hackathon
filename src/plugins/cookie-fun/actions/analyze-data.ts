@@ -1,4 +1,6 @@
 import { elizaLogger, ICacheManager } from "@elizaos/core";
+import BetterSQLite3 from "better-sqlite3";
+
 import {
   ActionExample,
   HandlerCallback,
@@ -7,6 +9,10 @@ import {
   State,
   type Action,
 } from "@elizaos/core";
+import {
+  TokenMetrics,
+  TokenMetricsProvider,
+} from "../providers/token-metrics-provider.ts";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -26,6 +32,34 @@ export const analyzeData: Action = {
   ): Promise<boolean> => {
     try {
       elizaLogger.log("📡 Analyzer started...");
+
+      const db = new BetterSQLite3("data/db.sqlite");
+
+      // Provider instanziieren
+      const tokenMetricsProvider = new TokenMetricsProvider(db);
+
+      // Beispiel-Daten
+      const exampleMetrics: TokenMetrics = {
+        tokenAddress: "0x1234567890abcdef",
+        symbol: "TEST",
+        mindshare: 85.5,
+        sentimentScore: 0.8,
+        liquidity: 1000000,
+        priceChange24h: 12.3,
+        holderDistribution: "Whale-Dominanz: 20%",
+        timestamp: new Date().toISOString(),
+        buySignal: true,
+      };
+
+      // Metriken speichern
+      tokenMetricsProvider.upsertTokenMetrics(exampleMetrics);
+
+      // Letzte Token-Metriken abrufen
+      const latestMetrics = tokenMetricsProvider.getLatestTokenMetrics();
+      console.log("📊 Letzte Token-Metriken:", latestMetrics);
+
+      // Token-Metriken löschen
+      // tokenMetricsProvider.removeTokenMetrics("0x1234567890abcdef");
 
       //TODO:
       //Hier instanziieren wir den CookieFunApiProvider und führen

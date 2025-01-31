@@ -1,94 +1,132 @@
-// So könnte unser token provider aussehen, der die Token-Metriken speichert und abruft.
+import BetterSQLite3 from "better-sqlite3";
 
-import {
-  Provider,
-  IAgentRuntime,
-  Memory,
-  State,
-  elizaLogger,
-  UUID,
-} from "@elizaos/core";
+export interface TokenMetrics {
+  tokenAddress: string;
+  symbol: string;
+  mindshare: number;
+  sentimentScore: number;
+  liquidity: number;
+  priceChange24h: number;
+  holderDistribution: string;
+  timestamp: string;
+  buySignal: boolean;
+  sellSignal?: boolean;
+  entryPrice?: number;
+  exitPrice?: number;
+  profitLoss?: number;
+}
 
 export class TokenMetricsProvider {
-  runtime: IAgentRuntime;
-  tableName: string;
+  private db: BetterSQLite3.Database;
 
-  constructor(runtime: IAgentRuntime) {
-    this.runtime = runtime;
-    this.tableName = "token_metrics"; // 🏦 Die Tabelle für Token-Daten
+  constructor(db: BetterSQLite3.Database) {
+    this.db = db;
+    this.initializeSchema();
   }
 
   /**
-   * Speichert oder aktualisiert die Token-Metriken.
-   * @param memory - Die Daten zu einem Token
+   * Erstellt die Tabelle, falls sie nicht existiert.
    */
-  async saveTokenMetrics(memory: Memory): Promise<void> {
-    try {
-      elizaLogger.log("💾 Storing token metrics:", memory.content);
-
-      await this.runtime.databaseAdapter.createMemory(memory, this.tableName);
-    } catch (error) {
-      elizaLogger.error("❌ Error saving token metrics:", error);
-    }
-  }
-
-  /**
-   * Ruft die neuesten Token-Metriken für einen bestimmten Token ab.
-   * @param roomId - Die Raum-ID
-   * @param count - Anzahl der Ergebnisse (Standard: 1)
-   */
-  async getLatestTokenMetrics(roomId: UUID, count = 1): Promise<Memory[]> {
-    try {
-      return await this.runtime.databaseAdapter.getMemories({
-        roomId: roomId,
-        tableName: this.tableName,
-        agentId: this.runtime.agentId,
-        count,
-      });
-    } catch (error) {
-      elizaLogger.error("❌ Error fetching token metrics:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Entfernt alle Token-Metriken für einen bestimmten Raum (z. B. wenn ein Token nicht mehr relevant ist).
-   * @param roomId - Die Raum-ID
-   */
-  async removeTokenMetrics(roomId: UUID): Promise<void> {
-    try {
-      elizaLogger.log("🗑 Removing token metrics for", roomId);
-      await this.runtime.databaseAdapter.removeAllMemories(
-        roomId,
-        this.tableName
+  private initializeSchema() {
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS token_metrics (
+        tokenAddress TEXT PRIMARY KEY,
+        symbol TEXT NOT NULL,
+        mindshare REAL NOT NULL,
+        sentimentScore REAL NOT NULL,
+        liquidity REAL NOT NULL,
+        priceChange24h REAL NOT NULL,
+        holderDistribution TEXT NOT NULL,
+        timestamp TEXT NOT NULL,
+        buySignal BOOLEAN NOT NULL,
+        sellSignal BOOLEAN,
+        entryPrice REAL,
+        exitPrice REAL,
+        profitLoss REAL
       );
+    `);
+  }
+
+  /**
+   * Fügt eine neue Token-Metrik ein oder aktualisiert sie, falls sie bereits existiert.
+   */
+  upsertTokenMetrics(metrics: TokenMetrics): boolean {
+    const sql = `
+      INSERT INTO token_metrics (
+        tokenAddress, symbol, mindshare, sentimentScore, liquidity, priceChange24h,
+        holderDistribution, timestamp, buySignal, sellSignal, entryPrice, exitPrice, profitLoss
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tokenAddress) DO UPDATE SET
+        mindshare = excluded.mindshare,
+        sentimentScore = excluded.sentimentScore,
+        liquidity = excluded.liquidity,
+        priceChange24h = excluded.priceChange24h,
+        holderDistribution = excluded.holderDistribution,
+        timestamp = excluded.timestamp,
+        buySignal = excluded.buySignal,
+        sellSignal = excluded.sellSignal,
+        entryPrice = excluded.entryPrice,
+        exitPrice = excluded.exitPrice,
+        profitLoss = excluded.profitLoss;
+    `;
+
+    try {
+      this.db.prepare(sql).run(
+        metrics.tokenAddress,
+        metrics.symbol,
+        metrics.mindshare,
+        metrics.sentimentScore,
+        metrics.liquidity,
+        metrics.priceChange24h,
+        JSON.stringify(metrics.holderDistribution ?? ""), // Falls ein Objekt, in JSON umwandeln
+        metrics.timestamp.toString(),
+        metrics.buySignal ? 1 : 0, // Boolean in 1/0 umwandeln
+        metrics.sellSignal ? 1 : 0,
+        metrics.entryPrice ?? null,
+        metrics.exitPrice ?? null,
+        metrics.profitLoss ?? null
+      );
+
+      console.log(`✅ TokenMetrics für ${metrics.tokenAddress} gespeichert.`);
+      return true;
     } catch (error) {
-      elizaLogger.error("❌ Error removing token metrics:", error);
+      console.error("❌ Fehler beim Speichern der Token-Metriken:", error);
+      return false;
     }
   }
 
   /**
-   * Sucht nach ähnlichen Token-Daten basierend auf Preis, Volumen oder Sentiment.
-   * @param embedding - Der eingebettete Vektor für Ähnlichkeitsvergleich
-   * @param roomId - Die Raum-ID
+   * Holt die letzten X gespeicherten Token-Metriken.
    */
-  async searchSimilarTokenMetrics(
-    embedding: number[],
-    roomId: UUID
-  ): Promise<Memory[]> {
+  getLatestTokenMetrics(count = 5): TokenMetrics[] {
+    const sql = `
+      SELECT * FROM token_metrics
+      ORDER BY timestamp DESC
+      LIMIT ?;
+    `;
+
     try {
-      return await this.runtime.databaseAdapter.searchMemories({
-        tableName: this.tableName,
-        roomId,
-        agentId: this.runtime.agentId,
-        embedding: embedding,
-        match_threshold: 0.1,
-        match_count: 5,
-        unique: true,
-      });
+      const rows = this.db.prepare(sql).all(count) as TokenMetrics[];
+      return rows;
     } catch (error) {
-      elizaLogger.error("❌ Error searching for similar token metrics:", error);
+      console.error("❌ Fehler beim Abrufen der Token-Metriken:", error);
       return [];
+    }
+  }
+
+  /**
+   * Löscht alle Token-Metriken für eine bestimmte Token-Adresse.
+   */
+  removeTokenMetrics(tokenAddress: string): boolean {
+    const sql = `DELETE FROM token_metrics WHERE tokenAddress = ?;`;
+
+    try {
+      this.db.prepare(sql).run(tokenAddress);
+      console.log(`🗑 Token-Metriken für ${tokenAddress} gelöscht.`);
+      return true;
+    } catch (error) {
+      console.error("❌ Fehler beim Löschen der Token-Metriken:", error);
+      return false;
     }
   }
 }
