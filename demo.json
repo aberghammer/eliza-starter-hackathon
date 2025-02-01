@@ -1,0 +1,655 @@
+{
+  "ok": {
+    "data": [
+      {
+        "agentName": "aixbt",
+        "contracts": [
+          {
+            "chain": 8453,
+            "contractAddress": "0x4F9Fd6Be4a90f2620860d680c0d4d5Fb53d1A825"
+          },
+          {
+            "chain": -2,
+            "contractAddress": "14zP2ToQ79XWvc7FQpm4bRnp9d6Mp1rFfsUW3gpLcRX"
+          }
+        ],
+        "twitterUsernames": ["aixbt_agent"],
+        "mindshare": 8.76108551277777,
+        "mindshareDeltaPercent": 12.373768383903995,
+        "marketCap": 342520513.426134,
+        "marketCapDeltaPercent": -35.39048856440796,
+        "price": 0.39855321,
+        "priceDeltaPercent": -36.12421289212474,
+        "liquidity": 11662664.201854452,
+        "volume24Hours": 24594479.10848139,
+        "volume24HoursDeltaPercent": -14.360994492782018,
+        "holdersCount": 276606,
+        "holdersCountDeltaPercent": 1.5004568522330717,
+        "averageImpressionsCount": 70491.94478527608,
+        "averageImpressionsCountDeltaPercent": -13.649318264997623,
+        "averageEngagementsCount": 508.4907975460123,
+        "averageEngagementsCountDeltaPercent": -14.635561056699963,
+        "followersCount": 457810,
+        "smartFollowersCount": 5387,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/PixOnChain/status/1883344706215788965",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1876349678184251392/AHux60f7_normal.jpg",
+            "tweetAuthorDisplayName": "Pix🔎",
+            "smartEngagementPoints": 40,
+            "impressionsCount": 46086
+          },
+          {
+            "tweetUrl": "https://x.com/CryptoStreamHub/status/1885259362836635940",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1506936845413896193/Q408ci62_normal.jpg",
+            "tweetAuthorDisplayName": "Crypto Stream",
+            "smartEngagementPoints": 11,
+            "impressionsCount": 143340
+          },
+          {
+            "tweetUrl": "https://x.com/DeFiTracer/status/1883549031185740286",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1681725760472530964/g389A7bW_normal.jpg",
+            "tweetAuthorDisplayName": "ᴛʀᴀᴄᴇʀ",
+            "smartEngagementPoints": 3,
+            "impressionsCount": 411067
+          },
+          {
+            "tweetUrl": "https://x.com/beast_ico/status/1883672527190589528",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1610827135978987522/qGWbuvec_normal.jpg",
+            "tweetAuthorDisplayName": "IcoBeast.eth🦇🔊",
+            "smartEngagementPoints": 15,
+            "impressionsCount": 77546
+          },
+          {
+            "tweetUrl": "https://x.com/rajgokal/status/1884783309005189622",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1884803233693970432/20ASqF-J_normal.jpg",
+            "tweetAuthorDisplayName": "raj 🖤",
+            "smartEngagementPoints": 7,
+            "impressionsCount": 138490
+          }
+        ]
+      },
+      {
+        "agentName": "Fartcoin",
+        "contracts": [
+          {
+            "chain": -2,
+            "contractAddress": "9BB6NFEcjBCtnNLFko2FqVQBq8HHM13kCyYcdQbgpump"
+          }
+        ],
+        "twitterUsernames": ["FartCoinOfSOL"],
+        "mindshare": 7.774989307876358,
+        "mindshareDeltaPercent": -39.49687545681223,
+        "marketCap": 869123429.674871,
+        "marketCapDeltaPercent": -26.15456452005288,
+        "price": 0.8592601,
+        "priceDeltaPercent": -27.27214941176197,
+        "liquidity": 27051336.56954696,
+        "volume24Hours": 120152418.049826,
+        "volume24HoursDeltaPercent": -2.9262885173299518,
+        "holdersCount": 103680,
+        "holdersCountDeltaPercent": 6.741341679364164,
+        "averageImpressionsCount": 26783.125,
+        "averageImpressionsCountDeltaPercent": -10.360517042710772,
+        "averageEngagementsCount": 436.75,
+        "averageEngagementsCountDeltaPercent": 19.65753424657534,
+        "followersCount": 59497,
+        "smartFollowersCount": 473,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/ErikVoorhees/status/1884988455723426022",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1866265437719117824/bOPwQJXE_normal.jpg",
+            "tweetAuthorDisplayName": "Erik Voorhees",
+            "smartEngagementPoints": 57,
+            "impressionsCount": 322332
+          },
+          {
+            "tweetUrl": "https://x.com/mikadontlouz/status/1884360170307739663",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1884619398985711616/XLP9I5OC_normal.jpg",
+            "tweetAuthorDisplayName": "Mika",
+            "smartEngagementPoints": 64,
+            "impressionsCount": 238462
+          },
+          {
+            "tweetUrl": "https://x.com/TaikiMaeda2/status/1883933885987447260",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1865978664535334912/H8YWnmXS_normal.jpg",
+            "tweetAuthorDisplayName": "Taiki Maeda",
+            "smartEngagementPoints": 31,
+            "impressionsCount": 442413
+          },
+          {
+            "tweetUrl": "https://x.com/ColdBloodShill/status/1883160360049660364",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1877391803587899393/rCSwnU7g_normal.jpg",
+            "tweetAuthorDisplayName": "Cold Blooded Shiller",
+            "smartEngagementPoints": 16,
+            "impressionsCount": 109272
+          },
+          {
+            "tweetUrl": "https://x.com/digitalartchick/status/1884368186017210697",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1878259830080622592/K2J4GN1r_normal.jpg",
+            "tweetAuthorDisplayName": "artchick.eth 🔥👠",
+            "smartEngagementPoints": 27,
+            "impressionsCount": 63107
+          }
+        ]
+      },
+      {
+        "agentName": "VIRTUAL",
+        "contracts": [
+          {
+            "chain": 8453,
+            "contractAddress": "0x0b3e328455c4059EEb9e3f84b5543F74E24e7E1b"
+          }
+        ],
+        "twitterUsernames": ["virtuals_io"],
+        "mindshare": 7.502239293754699,
+        "mindshareDeltaPercent": 107.73676140019579,
+        "marketCap": 1225544774.95334,
+        "marketCapDeltaPercent": -48.23809716856208,
+        "price": 1.8976429,
+        "priceDeltaPercent": -19.18996465275387,
+        "liquidity": 97025544.79629053,
+        "volume24Hours": 130509992.436054,
+        "volume24HoursDeltaPercent": 53.64447006770593,
+        "holdersCount": 394816,
+        "holdersCountDeltaPercent": 0.5536850362416654,
+        "averageImpressionsCount": 451338.1666666667,
+        "averageImpressionsCountDeltaPercent": 259.0412322884391,
+        "averageEngagementsCount": 2703.1666666666665,
+        "averageEngagementsCountDeltaPercent": 100.68052462261817,
+        "followersCount": 196420,
+        "smartFollowersCount": 2742,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/DegenerateNews/status/1883106492095893891",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1551586710873550848/8_M8f6ds_normal.jpg",
+            "tweetAuthorDisplayName": "DEGEN NEWS",
+            "smartEngagementPoints": 37,
+            "impressionsCount": 192374
+          },
+          {
+            "tweetUrl": "https://x.com/MeteoraAG/status/1883109297048932640",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1623689233813864450/XDk-DpAP_normal.jpg",
+            "tweetAuthorDisplayName": "Meteora",
+            "smartEngagementPoints": 32,
+            "impressionsCount": 195392
+          },
+          {
+            "tweetUrl": "https://x.com/RealJonahBlake/status/1883276026408833280",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1846269193370406912/06U5y96x_normal.jpg",
+            "tweetAuthorDisplayName": "Jonah 🎮",
+            "smartEngagementPoints": 47,
+            "impressionsCount": 133821
+          },
+          {
+            "tweetUrl": "https://x.com/beast_ico/status/1883192155142836725",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1610827135978987522/qGWbuvec_normal.jpg",
+            "tweetAuthorDisplayName": "IcoBeast.eth🦇🔊",
+            "smartEngagementPoints": 25,
+            "impressionsCount": 214375
+          },
+          {
+            "tweetUrl": "https://x.com/0xCygaar/status/1884418075102941210",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1874970187780194304/rEKKc4YC_normal.jpg",
+            "tweetAuthorDisplayName": "cygaar",
+            "smartEngagementPoints": 49,
+            "impressionsCount": 98820
+          }
+        ]
+      },
+      {
+        "agentName": "VVV",
+        "contracts": [
+          {
+            "chain": 8453,
+            "contractAddress": "0xacfE6019Ed1A7Dc6f7B508C02d1b04ec88cC21bf"
+          }
+        ],
+        "twitterUsernames": ["AskVenice"],
+        "mindshare": 5.371399982246807,
+        "mindshareDeltaPercent": 25420.256685893233,
+        "marketCap": 136475767.30898,
+        "marketCapDeltaPercent": 579.1479822745478,
+        "price": 5.58918958,
+        "priceDeltaPercent": 2684.405808156744,
+        "liquidity": 7558369.377198499,
+        "volume24Hours": 33667222.5304928,
+        "volume24HoursDeltaPercent": 3524.274205798446,
+        "holdersCount": 28001,
+        "holdersCountDeltaPercent": 147273.68421052632,
+        "averageImpressionsCount": 240498.7857142857,
+        "averageImpressionsCountDeltaPercent": 380.43546193810386,
+        "averageEngagementsCount": 1179,
+        "averageEngagementsCountDeltaPercent": 282.79220779220776,
+        "followersCount": 44161,
+        "smartFollowersCount": 1004,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/ErikVoorhees/status/1883944000857776309",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1866265437719117824/bOPwQJXE_normal.jpg",
+            "tweetAuthorDisplayName": "Erik Voorhees",
+            "smartEngagementPoints": 63,
+            "impressionsCount": 491683
+          },
+          {
+            "tweetUrl": "https://x.com/AerodromeFi/status/1884281689934798895",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1691174347388399617/AnNwWdzS_normal.jpg",
+            "tweetAuthorDisplayName": "Aerodrome",
+            "smartEngagementPoints": 48,
+            "impressionsCount": 459593
+          },
+          {
+            "tweetUrl": "https://x.com/base/status/1883926847429492823",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1840800810571350019/1pCjLY5q_normal.jpg",
+            "tweetAuthorDisplayName": "Base",
+            "smartEngagementPoints": 37,
+            "impressionsCount": 324241
+          },
+          {
+            "tweetUrl": "https://x.com/jessepollak/status/1883942709179867321",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1879556312822120448/QngrqCSC_normal.jpg",
+            "tweetAuthorDisplayName": "jesse.base.eth",
+            "smartEngagementPoints": 38,
+            "impressionsCount": 260465
+          },
+          {
+            "tweetUrl": "https://x.com/CoinbaseWallet/status/1883968902184722606",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1499783051974303748/sm3dkwbI_normal.png",
+            "tweetAuthorDisplayName": "Coinbase Wallet 🛡️",
+            "smartEngagementPoints": 23,
+            "impressionsCount": 256679
+          }
+        ]
+      },
+      {
+        "agentName": "Toshi",
+        "contracts": [
+          {
+            "chain": 8453,
+            "contractAddress": "0xAC1Bd2486aAf3B5C0fc3Fd868558b082a531B2B4"
+          }
+        ],
+        "twitterUsernames": ["Macintoshi_"],
+        "mindshare": 3.4464950009278206,
+        "mindshareDeltaPercent": 279.1291746535147,
+        "marketCap": 370839820.706817,
+        "marketCapDeltaPercent": 37.59858069039876,
+        "price": 0.0008815,
+        "priceDeltaPercent": 32.58031524485622,
+        "liquidity": 5374843.44063875,
+        "volume24Hours": 17132726.3497637,
+        "volume24HoursDeltaPercent": -51.96931810357226,
+        "holdersCount": 447977,
+        "holdersCountDeltaPercent": 2.3400055741614767,
+        "averageImpressionsCount": 1,
+        "averageImpressionsCountDeltaPercent": -99.92560215753743,
+        "averageEngagementsCount": 1,
+        "averageEngagementsCountDeltaPercent": -95.03105590062113,
+        "followersCount": 706,
+        "smartFollowersCount": 6,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/TYI_ER/status/1883527607226134750",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1867320746034278400/FwantF_b_normal.jpg",
+            "tweetAuthorDisplayName": "d9 🐧",
+            "smartEngagementPoints": 24,
+            "impressionsCount": 976782
+          },
+          {
+            "tweetUrl": "https://x.com/jconorgrogan/status/1883555769070825827",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1580022203235663872/XSyjlu1t_normal.jpg",
+            "tweetAuthorDisplayName": "Conor",
+            "smartEngagementPoints": 6,
+            "impressionsCount": 139709
+          },
+          {
+            "tweetUrl": "https://x.com/CrashiusClay69/status/1883573481700520031",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1671372997368659968/W6VWPN9T_normal.jpg",
+            "tweetAuthorDisplayName": "Crash",
+            "smartEngagementPoints": 7,
+            "impressionsCount": 116314
+          },
+          {
+            "tweetUrl": "https://x.com/Tyler_Did_It/status/1883572016189726785",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1561354964534018049/T9lKN_2c_normal.jpg",
+            "tweetAuthorDisplayName": "TylerD 🧙‍♂️",
+            "smartEngagementPoints": 10,
+            "impressionsCount": 65416
+          },
+          {
+            "tweetUrl": "https://x.com/0x_Imperius/status/1883633660651560979",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1885066952625868801/FVeCPihr_normal.jpg",
+            "tweetAuthorDisplayName": "Pennski Hardaway",
+            "smartEngagementPoints": 8,
+            "impressionsCount": 67443
+          }
+        ]
+      },
+      {
+        "agentName": "Griffain",
+        "contracts": [
+          {
+            "chain": -2,
+            "contractAddress": "KENJSUYLASHUMfHyy5o4Hp2FdNqZg1AsUPhfH2kYvEP"
+          }
+        ],
+        "twitterUsernames": ["griffaindotcom"],
+        "mindshare": 3.3296482493159427,
+        "mindshareDeltaPercent": -12.084179101222723,
+        "marketCap": 201019538.827654,
+        "marketCapDeltaPercent": -53.5842991516223,
+        "price": 0.20126572,
+        "priceDeltaPercent": -53.73380096895577,
+        "liquidity": 6895176.234059445,
+        "volume24Hours": 28112305.0057927,
+        "volume24HoursDeltaPercent": -14.96388511433847,
+        "holdersCount": 64649,
+        "holdersCountDeltaPercent": 3.6855864380683547,
+        "averageImpressionsCount": 231635,
+        "averageImpressionsCountDeltaPercent": 162.25898123931478,
+        "averageEngagementsCount": 1810.125,
+        "averageEngagementsCountDeltaPercent": 36.27893845285149,
+        "followersCount": 120034,
+        "smartFollowersCount": 1314,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/solana/status/1883259495817843165",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1472933274209107976/6u-LQfjG_normal.jpg",
+            "tweetAuthorDisplayName": "Solana",
+            "smartEngagementPoints": 39,
+            "impressionsCount": 704233
+          },
+          {
+            "tweetUrl": "https://x.com/DamiDefi/status/1883145942028914780",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1833982252272795649/YdQvXW46_normal.jpg",
+            "tweetAuthorDisplayName": "Dami-Defi",
+            "smartEngagementPoints": 4,
+            "impressionsCount": 557168
+          },
+          {
+            "tweetUrl": "https://x.com/CryptoStreamHub/status/1885259362836635940",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1506936845413896193/Q408ci62_normal.jpg",
+            "tweetAuthorDisplayName": "Crypto Stream",
+            "smartEngagementPoints": 11,
+            "impressionsCount": 143340
+          },
+          {
+            "tweetUrl": "https://x.com/aeyakovenko/status/1883268841679323203",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1867340003766153216/_J-fkeCd_normal.jpg",
+            "tweetAuthorDisplayName": "toly 🇺🇸",
+            "smartEngagementPoints": 9,
+            "impressionsCount": 163126
+          },
+          {
+            "tweetUrl": "https://x.com/ashrobinqt/status/1884358403646185557",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1616178369011269648/2MUSZzrQ_normal.jpg",
+            "tweetAuthorDisplayName": "AshRobin 🐶",
+            "smartEngagementPoints": 12,
+            "impressionsCount": 55195
+          }
+        ]
+      },
+      {
+        "agentName": "ai16z",
+        "contracts": [
+          {
+            "chain": -2,
+            "contractAddress": "HeLp6NuQkmYB4pYWo2zYs22mESHXPQYzXbB8n4V98jwC"
+          }
+        ],
+        "twitterUsernames": ["ai16zdao", "pmairca"],
+        "mindshare": 3.1053153974644014,
+        "mindshareDeltaPercent": -25.73823883459292,
+        "marketCap": 583556908.25063,
+        "marketCapDeltaPercent": -35.257832425995865,
+        "price": 0.52817093,
+        "priceDeltaPercent": -35.63849053010591,
+        "liquidity": 9107638.495558267,
+        "volume24Hours": 30303231.6503921,
+        "volume24HoursDeltaPercent": -44.967524150643264,
+        "holdersCount": 112839,
+        "holdersCountDeltaPercent": 0.6637227351799813,
+        "averageImpressionsCount": 18991.375,
+        "averageImpressionsCountDeltaPercent": -44.186721427705514,
+        "averageEngagementsCount": 225.375,
+        "averageEngagementsCountDeltaPercent": -6.337662337662338,
+        "followersCount": 139643,
+        "smartFollowersCount": 2001,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/thedefiedge/status/1883777253852754423",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1879099772545671169/COr4zjOn_normal.jpg",
+            "tweetAuthorDisplayName": "Edgy - The DeFi Edge 🗡️",
+            "smartEngagementPoints": 13,
+            "impressionsCount": 307085
+          },
+          {
+            "tweetUrl": "https://x.com/Defi0xJeff/status/1883731598807543941",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1846579538802982912/9qCfx_WU_normal.jpg",
+            "tweetAuthorDisplayName": "0xJeff",
+            "smartEngagementPoints": 28,
+            "impressionsCount": 116673
+          },
+          {
+            "tweetUrl": "https://x.com/CryptoStreamHub/status/1885259362836635940",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1506936845413896193/Q408ci62_normal.jpg",
+            "tweetAuthorDisplayName": "Crypto Stream",
+            "smartEngagementPoints": 11,
+            "impressionsCount": 143340
+          },
+          {
+            "tweetUrl": "https://x.com/APompliano/status/1883897871168311375",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1547787118243561478/PxWzJo1H_normal.jpg",
+            "tweetAuthorDisplayName": "Anthony Pompliano 🌪",
+            "smartEngagementPoints": 4,
+            "impressionsCount": 286740
+          },
+          {
+            "tweetUrl": "https://x.com/laurashin/status/1884323314551963910",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1539462748173746176/hxR80FYT_normal.png",
+            "tweetAuthorDisplayName": "Laura Shin",
+            "smartEngagementPoints": 12,
+            "impressionsCount": 106242
+          }
+        ]
+      },
+      {
+        "agentName": "FCHAIN",
+        "contracts": [
+          {
+            "chain": -2,
+            "contractAddress": "jUpa2aDCzvdR9EF4fqDXmuyMUkonPTohphABLmRkRFj"
+          }
+        ],
+        "twitterUsernames": ["fchainxyz"],
+        "mindshare": 2.8359545847016556,
+        "mindshareDeltaPercent": 313.60011436467437,
+        "marketCap": 1,
+        "marketCapDeltaPercent": 0,
+        "price": 0.03541906,
+        "priceDeltaPercent": 3005.8167392133464,
+        "liquidity": 1297320.9177252606,
+        "volume24Hours": 602971.034505234,
+        "volume24HoursDeltaPercent": 1277.6720373394046,
+        "holdersCount": 5363,
+        "holdersCountDeltaPercent": 536200,
+        "averageImpressionsCount": 107866.44444444444,
+        "averageImpressionsCountDeltaPercent": -63.76849483500319,
+        "averageEngagementsCount": 881.7777777777778,
+        "averageEngagementsCountDeltaPercent": -97.45656310718506,
+        "followersCount": 79727,
+        "smartFollowersCount": 548,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/dingalingts/status/1884635511152857134",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1671535865145745410/DaM1zme1_normal.jpg",
+            "tweetAuthorDisplayName": "dingaling",
+            "smartEngagementPoints": 82,
+            "impressionsCount": 97008
+          },
+          {
+            "tweetUrl": "https://x.com/HollanderAdam/status/1884628939617796155",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1870826745319862272/5e5fnYWM_normal.jpg",
+            "tweetAuthorDisplayName": "Adam Hollander",
+            "smartEngagementPoints": 60,
+            "impressionsCount": 34463
+          },
+          {
+            "tweetUrl": "https://x.com/farawaygg/status/1884613506382905507",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1633917126535790598/EGPSdcbv_normal.jpg",
+            "tweetAuthorDisplayName": "Faraway",
+            "smartEngagementPoints": 19,
+            "impressionsCount": 64121
+          },
+          {
+            "tweetUrl": "https://x.com/EasyEatsBodega/status/1884312367993098724",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1670794831428304904/rV3aLfpH_normal.jpg",
+            "tweetAuthorDisplayName": "Easy",
+            "smartEngagementPoints": 15,
+            "impressionsCount": 76283
+          },
+          {
+            "tweetUrl": "https://x.com/RealJonahBlake/status/1884626881397342228",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1846269193370406912/06U5y96x_normal.jpg",
+            "tweetAuthorDisplayName": "Jonah 🎮",
+            "smartEngagementPoints": 28,
+            "impressionsCount": 28985
+          }
+        ]
+      },
+      {
+        "agentName": "Moby AI",
+        "contracts": [
+          {
+            "chain": -2,
+            "contractAddress": "Cy1GS2FqefgaMbi45UunrUzin1rfEmTUYnomddzBpump"
+          }
+        ],
+        "twitterUsernames": ["mobyagent"],
+        "mindshare": 1.7217142903253602,
+        "mindshareDeltaPercent": 3.835047307083745,
+        "marketCap": 69475327.2020978,
+        "marketCapDeltaPercent": -40.92366276488097,
+        "price": 0.06921816,
+        "priceDeltaPercent": -41.07351049378254,
+        "liquidity": 3089125.178367706,
+        "volume24Hours": 20179192.7287077,
+        "volume24HoursDeltaPercent": -49.22652374394445,
+        "holdersCount": 25113,
+        "holdersCountDeltaPercent": 8.152454780361756,
+        "averageImpressionsCount": 20559.23691460055,
+        "averageImpressionsCountDeltaPercent": -12.123337487618995,
+        "averageEngagementsCount": 153.48209366391185,
+        "averageEngagementsCountDeltaPercent": -9.07787162133908,
+        "followersCount": 85610,
+        "smartFollowersCount": 796,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/mattdorta/status/1883998108272713799",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1760347829166379008/Rjrt7Uv3_normal.jpg",
+            "tweetAuthorDisplayName": "Matias | AssetDash 🏁",
+            "smartEngagementPoints": 24,
+            "impressionsCount": 367015
+          },
+          {
+            "tweetUrl": "https://x.com/mattdorta/status/1884263477252173998",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1760347829166379008/Rjrt7Uv3_normal.jpg",
+            "tweetAuthorDisplayName": "Matias | AssetDash 🏁",
+            "smartEngagementPoints": 16,
+            "impressionsCount": 113000
+          },
+          {
+            "tweetUrl": "https://x.com/mattdorta/status/1884405554535158183",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1760347829166379008/Rjrt7Uv3_normal.jpg",
+            "tweetAuthorDisplayName": "Matias | AssetDash 🏁",
+            "smartEngagementPoints": 14,
+            "impressionsCount": 127511
+          },
+          {
+            "tweetUrl": "https://x.com/CryptoStreamHub/status/1885259362836635940",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1506936845413896193/Q408ci62_normal.jpg",
+            "tweetAuthorDisplayName": "Crypto Stream",
+            "smartEngagementPoints": 11,
+            "impressionsCount": 143340
+          },
+          {
+            "tweetUrl": "https://x.com/mattdorta/status/1885074510170218591",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1760347829166379008/Rjrt7Uv3_normal.jpg",
+            "tweetAuthorDisplayName": "Matias | AssetDash 🏁",
+            "smartEngagementPoints": 5,
+            "impressionsCount": 111534
+          }
+        ]
+      },
+      {
+        "agentName": "HENLO",
+        "contracts": [
+          {
+            "chain": 8453,
+            "contractAddress": "0x23a96680ccde03bd4bdd9a3e9a0cb56a5d27f7c9"
+          }
+        ],
+        "twitterUsernames": ["ciniz"],
+        "mindshare": 1.57614002243321,
+        "mindshareDeltaPercent": 70.35352479974726,
+        "marketCap": 23245536.2139323,
+        "marketCapDeltaPercent": -22.28993203006443,
+        "price": 1.3e-7,
+        "priceDeltaPercent": -23.529411764705877,
+        "liquidity": 1230238.9638778043,
+        "volume24Hours": 930100.081148379,
+        "volume24HoursDeltaPercent": 21.546964524805098,
+        "holdersCount": 59079,
+        "holdersCountDeltaPercent": 0.13389830508474576,
+        "averageImpressionsCount": 10993.478260869566,
+        "averageImpressionsCountDeltaPercent": 36.08058394827607,
+        "averageEngagementsCount": 154.56521739130434,
+        "averageEngagementsCountDeltaPercent": 27.696773767896016,
+        "followersCount": 82189,
+        "smartFollowersCount": 3091,
+        "topTweets": [
+          {
+            "tweetUrl": "https://x.com/berachain/status/1884046557848432997",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1775162753499508736/2XBUzQhl_normal.jpg",
+            "tweetAuthorDisplayName": "Berachain Foundation 🐻⛓",
+            "smartEngagementPoints": 74,
+            "impressionsCount": 873473
+          },
+          {
+            "tweetUrl": "https://x.com/JumperExchange/status/1884174343099330877",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1874777546144796672/vVqnY8lv_normal.jpg",
+            "tweetAuthorDisplayName": "Jumper",
+            "smartEngagementPoints": 20,
+            "impressionsCount": 165091
+          },
+          {
+            "tweetUrl": "https://x.com/kaiynne/status/1884536670495953324",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1881304241144467456/Dzdwq0rO_normal.jpg",
+            "tweetAuthorDisplayName": "kain",
+            "smartEngagementPoints": 13,
+            "impressionsCount": 144586
+          },
+          {
+            "tweetUrl": "https://x.com/blknoiz06/status/1884370786787414175",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1868298971837255680/cN-ikO7h_normal.jpg",
+            "tweetAuthorDisplayName": "Ansem 🧸💸",
+            "smartEngagementPoints": 7,
+            "impressionsCount": 64671
+          },
+          {
+            "tweetUrl": "https://x.com/ericonomic/status/1884345505104515217",
+            "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1831989333076668416/gy5MoDd9_normal.jpg",
+            "tweetAuthorDisplayName": "Ericonomic",
+            "smartEngagementPoints": 8,
+            "impressionsCount": 54772
+          }
+        ]
+      }
+    ],
+    "currentPage": 1,
+    "totalPages": 138,
+    "totalCount": 1378
+  },
+  "success": true,
+  "error": null
+}

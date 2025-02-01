@@ -1,5 +1,4 @@
 import { elizaLogger, ICacheManager } from "@elizaos/core";
-import BetterSQLite3 from "better-sqlite3";
 
 import {
   ActionExample,
@@ -10,18 +9,22 @@ import {
   type Action,
 } from "@elizaos/core";
 
-import {
-  TokenMetrics,
-  TokenMetricsProvider,
-} from "../providers/token-metrics-provider.ts";
+import { TwitterConfig } from "../providers/twitter-provider/index.ts";
 
+import { TwitterManager } from "../providers/twitter-provider/twitter-base-provider.ts";
+
+import { validateTwitterConfig } from "../providers/twitter-provider/environment.ts";
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
-import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 
-export const analyzeData: Action = {
-  name: "ANALYZE_DATA",
-  similes: ["ANALYZE", "GET COOKIE DATA", "DATA ANALYZE ACTION"],
-  description: "Getting Data from Cookie.fun.",
+export const tweetMindshare: Action = {
+  name: "TWEET_MINDSHARE",
+  similes: [
+    "TWEET ACTION",
+    "tweetmindshare",
+    "POST SOME TWEETS",
+    "POST MINDSHARE TWITTER",
+  ],
+  description: "Getting Data from Cookie.fun and tweeting current mindshare",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
@@ -37,75 +40,77 @@ export const analyzeData: Action = {
     try {
       elizaLogger.log("📡 Analyzer started...");
 
-      elizaLogger.log("📡 TODO: NOTHING IMPLEMENTED,YET...");
+      // check if the twitter config is valid - if not set your ENV variables correctly.
+      const twitterConfig: TwitterConfig = await validateTwitterConfig(
+        _runtime
+      );
 
-      const db = new BetterSQLite3("data/db.sqlite");
-      const tokenMetricsProvider = new TokenMetricsProvider(db);
+      // create a new twitter manager.
+      // the twitter manager can now
+      // be used to interact with the twitter api.
+      // we have some basic stuff like initializing the client
+      // and scrapint tweets from a list of accounts.
+      const manager = new TwitterManager(_runtime, twitterConfig);
+      await manager.client.init();
+
       const cookieProvider = new CookieApiProvider(_runtime);
-      const dexscreenerProvider = new DexscreenerProvider();
 
-      const response = await cookieProvider.fetchAgentByTwitter("aixbt_agent");
+      // API-Aufruf für die Top 10 Agents mit dem höchsten Mindshare
+      const agentsResponse = await cookieProvider.fetchAgentsPaged(
+        "_7Days",
+        1,
+        10
+      );
+
+      if (!agentsResponse?.ok?.data || !Array.isArray(agentsResponse.ok.data)) {
+        throw new Error("Invalid response format from fetchAgentsPaged");
+      }
+
+      // Extrahiere Twitter-Usernames & sortiere nach Mindshare (absteigend)
+      const topTwitterAccounts = agentsResponse.ok.data
+        .sort((a, b) => b.mindshare - a.mindshare) // Mindshare absteigend sortieren
+        .flatMap((agent) => agent.twitterUsernames) // Extrahiere alle Twitter-Usernames
+        .filter(Boolean) // Entferne leere Werte
+        .slice(0, 10); // Behalte nur die Top 10
+
+      console.log("📢 Top Twitter Accounts:", topTwitterAccounts);
+
+      // Setze die Top 10 Accounts in `putAccountsIntoChunks()`
+      manager.interaction.putAccountsIntoChunks(topTwitterAccounts);
+
+      // We put the tweets into chunks and collect the data
+      // from the twitter api.
+      // in the end a post is created with the data.
+      //   const summary = await manager.interaction.handleTwitterBatch();
+
+      //   const tweet = summary
+      //     ? await manager.interaction.createTweet(summary)
+      //     : null;
+
+      elizaLogger.log("📡 Analyzer finished...");
 
       //___________SCHREIBEN DER ERGEBNISSE IN DIE DATENBANK____________________________
 
-      // Provider instanziieren
-      if (!response?.ok) {
-        throw new Error("Invalid API response");
-      }
-
-      const agent = response.ok;
-
-      // Token-Daten extrahieren (erstes Contract-Token nehmen)
-      const tokenAddress =
-        agent.contracts.length > 0
-          ? agent.contracts[0].contractAddress
-          : "UNKNOWN";
-
-      // Daten für die Datenbank formatieren
-      const tokenMetrics: TokenMetrics = {
-        tokenAddress,
-        symbol: agent.agentName.toUpperCase(), // Symbol aus AgentName ableiten
-        mindshare: agent.mindshare || 0,
-        sentimentScore: agent.mindshareDeltaPercent || 0, // Hier könnte eine bessere Sentiment-Berechnung erfolgen
-        liquidity: agent.liquidity || 0,
-        priceChange24h: agent.priceDeltaPercent || 0,
-        holderDistribution: `Holders: ${agent.holdersCount} (Change: ${agent.holdersCountDeltaPercent}%)`,
-        timestamp: new Date().toISOString(),
-        buySignal: agent.mindshareDeltaPercent > 10, // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
-      };
-
-      let buyPrice = 0;
-
-      const existingTrade = tokenMetricsProvider
-        .getActiveTrades()
-        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress);
-
-      if (!existingTrade) {
-        tokenMetricsProvider.insertTokenMetrics(tokenMetrics);
-        elizaLogger.log(
-          `✅ Neuer Trade für ${tokenMetrics.tokenAddress} angelegt.`
-        );
-
-        if (tokenMetrics.buySignal) {
-          // Token kaufen
-          const currentStats = await dexscreenerProvider.fetchTokenPrice(
-            tokenAddress
-          );
-          elizaLogger.log("🚀 Token gekauft:", currentStats.price);
-          buyPrice = currentStats.price;
-          //TODO: send tweet
-        }
-      } else {
-        elizaLogger.log(
-          `⚠️ Trade für ${tokenMetrics.tokenAddress} existiert bereits. Kein neuer Eintrag.`
-        );
-      }
-      // Daten in die Datenbank speichern
+      // const db = new BetterSQLite3("data/db.sqlite");
+      // // Provider instanziieren
+      // const tokenMetricsProvider = new TokenMetricsProvider(db);
+      // // Beispiel-Daten
+      // const exampleMetrics: TokenMetrics = {
+      //   tokenAddress: "0x1234567890abcdef",
+      //   symbol: "TEST",
+      //   mindshare: 85.5,
+      //   sentimentScore: 0.8,
+      //   liquidity: 1000000,
+      //   priceChange24h: 12.3,
+      //   holderDistribution: "Whale-Dominanz: 20%",
+      //   timestamp: new Date().toISOString(),
+      //   buySignal: true,
+      // };
       // // Metriken speichern
-
-      tokenMetrics.entryPrice = buyPrice;
+      // tokenMetricsProvider.upsertTokenMetrics(exampleMetrics);
       // // Letzte Token-Metriken abrufen
-      tokenMetricsProvider.upsertTokenMetrics(tokenMetrics);
+      // const latestMetrics = tokenMetricsProvider.getLatestTokenMetrics();
+      // console.log("📊 Letzte Token-Metriken:", latestMetrics);
 
       //____________________________________________________________________________________
 
@@ -128,11 +133,9 @@ export const analyzeData: Action = {
       // const twitterProvider = new TwitterProvider(...);
       // twitterProvider.tweet("I just bought the token");
 
-      elizaLogger.log("📡 Analyzer finished...");
-
       _callback({
         text: `🚀 Data sucessfully analyzed`,
-        action: "TWEET_MINDSHARE",
+        action: "DATA_ANALYZED",
       });
 
       return true;

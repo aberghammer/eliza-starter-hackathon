@@ -1,4 +1,4 @@
-import { elizaLogger, ICacheManager } from "@elizaos/core";
+import { elizaLogger, ICacheManager, UUID } from "@elizaos/core";
 import {
   ActionExample,
   HandlerCallback,
@@ -28,6 +28,30 @@ export const housekeeping: Action = {
       elizaLogger.log("📡 Running everything every few minutes");
 
       //TODO:
+
+      // Actions definieren
+      const actionsToRun = ["ANALYZE_DATA", "TWEET_MINDSHARE"];
+      const actionMemories: Memory[] = actionsToRun.map((actionName) => ({
+        id: `${_message.id}-${actionName}` as UUID,
+        agentId: _runtime.agentId,
+        userId: _message.userId,
+        roomId: _message.roomId,
+        createdAt: Date.now(),
+        content: {
+          text: `Executing ${actionName}`,
+          action: actionName, // **Hier liegt die Änderung!** 🔥
+        },
+      }));
+
+      // `processActions()` ausführen mit den Dummy-Responses
+      await _runtime.processActions(
+        _message,
+        actionMemories,
+        _state,
+        _callback
+      );
+
+      elizaLogger.log("✅ All actions completed successfully!");
 
       // run in loop and call
       // await runtime.callAction("SECOND_ACTION", { someData: "data" });

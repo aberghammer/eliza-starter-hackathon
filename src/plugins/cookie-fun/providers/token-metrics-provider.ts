@@ -96,6 +96,42 @@ export class TokenMetricsProvider {
   }
 
   /**
+   * Fügt eine neue Token-Metrik ein, wenn sie noch nicht existiert.
+   */
+  public insertTokenMetrics(metrics: TokenMetrics): boolean {
+    const sql = `
+        INSERT INTO token_metrics (
+          tokenAddress, symbol, mindshare, sentimentScore, liquidity, priceChange24h,
+          holderDistribution, timestamp, buySignal, sellSignal, entryPrice, exitPrice, profitLoss
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+      `;
+
+    try {
+      this.db.prepare(sql).run(
+        metrics.tokenAddress,
+        metrics.symbol,
+        metrics.mindshare,
+        metrics.sentimentScore,
+        metrics.liquidity,
+        metrics.priceChange24h,
+        JSON.stringify(metrics.holderDistribution ?? ""), // Falls ein Objekt, in JSON umwandeln
+        metrics.timestamp.toString(),
+        metrics.buySignal ? 1 : 0, // Boolean in 1/0 umwandeln
+        metrics.sellSignal ? 1 : 0,
+        metrics.entryPrice ?? null,
+        metrics.exitPrice ?? null,
+        metrics.profitLoss ?? null
+      );
+
+      console.log(`✅ Neuer Eintrag für ${metrics.tokenAddress} gespeichert.`);
+      return true;
+    } catch (error) {
+      console.error("❌ Fehler beim Speichern der Token-Metriken:", error);
+      return false;
+    }
+  }
+
+  /**
    * Holt die letzten X gespeicherten Token-Metriken.
    */
   getLatestTokenMetrics(count = 5): TokenMetrics[] {
@@ -111,6 +147,39 @@ export class TokenMetricsProvider {
     } catch (error) {
       console.error("❌ Fehler beim Abrufen der Token-Metriken:", error);
       return [];
+    }
+  }
+
+  public getActiveTrades(): TokenMetrics[] {
+    const sql = `
+      SELECT * FROM token_metrics
+      WHERE entryPrice IS NOT NULL AND exitPrice IS NULL
+      ORDER BY timestamp DESC;
+    `;
+
+    try {
+      const rows = this.db.prepare(sql).all() as TokenMetrics[];
+      return rows;
+    } catch (error) {
+      console.error("❌ Fehler beim Abrufen der offenen Trades:", error);
+      return [];
+    }
+  }
+
+  public updateExitPrice(tokenAddress: string, exitPrice: number): void {
+    const sql = `
+      UPDATE token_metrics
+      SET exitPrice = ?
+      WHERE tokenAddress = ? AND exitPrice IS NULL;
+    `;
+
+    try {
+      this.db.prepare(sql).run(exitPrice, tokenAddress);
+      console.log(
+        `✅ Verkauf eingetragen für ${tokenAddress} zum Preis ${exitPrice}`
+      );
+    } catch (error) {
+      console.error("❌ Fehler beim Setzen des exitPrice:", error);
     }
   }
 

@@ -7,6 +7,9 @@ import {
   State,
   type Action,
 } from "@elizaos/core";
+import BetterSQLite3 from "better-sqlite3";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 
 export const checkSell: Action = {
   name: "CHECK_SELL",
@@ -26,6 +29,60 @@ export const checkSell: Action = {
   ): Promise<boolean> => {
     try {
       elizaLogger.log("📡 Checking for gainz... or losses whatever 🐸");
+
+      const db = new BetterSQLite3("data/db.sqlite");
+      const tokenMetricsProvider = new TokenMetricsProvider(db);
+      const dexscreenerProvider = new DexscreenerProvider();
+
+      const openTrades = tokenMetricsProvider.getActiveTrades();
+      elizaLogger.log(`📊 ${openTrades.length} offene Trades gefunden`);
+
+      for (const trade of openTrades) {
+        const currentPriceData = await dexscreenerProvider.fetchTokenPrice(
+          trade.tokenAddress
+        );
+        const currentPrice = currentPriceData.price;
+
+        if (!currentPrice) {
+          elizaLogger.error(`⚠️ Kein Preis für ${trade.tokenAddress} gefunden`);
+          continue;
+        }
+
+        const priceIncrease =
+          ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
+        const priceDecrease =
+          ((trade.entryPrice - currentPrice) / trade.entryPrice) * 100;
+
+        if (priceIncrease >= 30) {
+          elizaLogger.log(
+            `✅ Verkaufe ${trade.symbol} mit +${priceIncrease.toFixed(
+              2
+            )}% Gewinn!`
+          );
+          tokenMetricsProvider.updateExitPrice(
+            trade.tokenAddress,
+            currentPrice
+          );
+          // TODO: Implementiere Verkauf & Twitter-Update
+        } else if (priceDecrease >= 20) {
+          elizaLogger.log(
+            `⛔ Verkaufe ${trade.symbol} mit -${priceDecrease.toFixed(
+              2
+            )}% Verlust!`
+          );
+          tokenMetricsProvider.updateExitPrice(
+            trade.tokenAddress,
+            currentPrice
+          );
+          // TODO: Implementiere Verkauf & Twitter-Update
+        } else {
+          elizaLogger.log(
+            `📈 ${trade.symbol} hat aktuell +${priceIncrease.toFixed(
+              2
+            )}% Gewinn und -${priceDecrease.toFixed(2)}% Verlust`
+          );
+        }
+      }
 
       //TODO:
 

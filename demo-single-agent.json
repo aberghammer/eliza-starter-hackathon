@@ -1,0 +1,72 @@
+{
+  "ok": {
+    "agentName": "aixbt",
+    "contracts": [
+      {
+        "chain": 8453,
+        "contractAddress": "0x4F9Fd6Be4a90f2620860d680c0d4d5Fb53d1A825"
+      },
+      {
+        "chain": -2,
+        "contractAddress": "14zP2ToQ79XWvc7FQpm4bRnp9d6Mp1rFfsUW3gpLcRX"
+      }
+    ],
+    "twitterUsernames": ["aixbt_agent"],
+    "mindshare": 8.76108551277777,
+    "mindshareDeltaPercent": 12.373768383903995,
+    "marketCap": 341368543.395571,
+    "marketCapDeltaPercent": -35.9460352687617,
+    "price": 0.39662208,
+    "priceDeltaPercent": -36.312460714354245,
+    "liquidity": 11670576.183372319,
+    "volume24Hours": 24594479.10848139,
+    "volume24HoursDeltaPercent": -14.360994492782018,
+    "holdersCount": 276606,
+    "holdersCountDeltaPercent": 1.5004568522330717,
+    "averageImpressionsCount": 70491.94478527608,
+    "averageImpressionsCountDeltaPercent": -13.649318264997623,
+    "averageEngagementsCount": 508.4907975460123,
+    "averageEngagementsCountDeltaPercent": -14.635561056699963,
+    "followersCount": 457810,
+    "smartFollowersCount": 5387,
+    "topTweets": [
+      {
+        "tweetUrl": "https://x.com/PixOnChain/status/1883344706215788965",
+        "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1876349678184251392/AHux60f7_normal.jpg",
+        "tweetAuthorDisplayName": "Pix🔎",
+        "smartEngagementPoints": 40,
+        "impressionsCount": 46086
+      },
+      {
+        "tweetUrl": "https://x.com/CryptoStreamHub/status/1885259362836635940",
+        "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1506936845413896193/Q408ci62_normal.jpg",
+        "tweetAuthorDisplayName": "Crypto Stream",
+        "smartEngagementPoints": 11,
+        "impressionsCount": 143340
+      },
+      {
+        "tweetUrl": "https://x.com/DeFiTracer/status/1883549031185740286",
+        "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1681725760472530964/g389A7bW_normal.jpg",
+        "tweetAuthorDisplayName": "ᴛʀᴀᴄᴇʀ",
+        "smartEngagementPoints": 3,
+        "impressionsCount": 411067
+      },
+      {
+        "tweetUrl": "https://x.com/beast_ico/status/1883672527190589528",
+        "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1610827135978987522/qGWbuvec_normal.jpg",
+        "tweetAuthorDisplayName": "IcoBeast.eth🦇🔊",
+        "smartEngagementPoints": 15,
+        "impressionsCount": 77546
+      },
+      {
+        "tweetUrl": "https://x.com/rajgokal/status/1884783309005189622",
+        "tweetAuthorProfileImageUrl": "https://pbs.twimg.com/profile_images/1884803233693970432/20ASqF-J_normal.jpg",
+        "tweetAuthorDisplayName": "raj 🖤",
+        "smartEngagementPoints": 7,
+        "impressionsCount": 138490
+      }
+    ]
+  },
+  "success": true,
+  "error": null
+}
