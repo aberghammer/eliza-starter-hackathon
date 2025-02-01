@@ -166,20 +166,21 @@ export class TokenMetricsProvider {
     }
   }
 
-  public updateExitPrice(tokenAddress: string, exitPrice: number): void {
+  public updateExitPrice(tokenAddress: string, exitPrice: number, profitLoss: number): void {
     const sql = `
       UPDATE token_metrics
-      SET exitPrice = ?
+      SET exitPrice = ?,
+          profitLoss = ?
       WHERE tokenAddress = ? AND exitPrice IS NULL;
     `;
 
     try {
-      this.db.prepare(sql).run(exitPrice, tokenAddress);
+      this.db.prepare(sql).run(exitPrice, profitLoss, tokenAddress);
       console.log(
-        `✅ Verkauf eingetragen für ${tokenAddress} zum Preis ${exitPrice}`
+        `✅ Exit price ${exitPrice} and P/L ${profitLoss}% recorded for ${tokenAddress}`
       );
     } catch (error) {
-      console.error("❌ Fehler beim Setzen des exitPrice:", error);
+      console.error("❌ Error updating exit price:", error);
     }
   }
 

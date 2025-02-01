@@ -10,10 +10,12 @@ import {
 import BetterSQLite3 from "better-sqlite3";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
+import { UUID } from "crypto";
 
 export const checkSell: Action = {
   name: "CHECK_SELL",
-  similes: ["SELL TOKEN", "CHECK SELL TOKEN", "SELL NOW"],
+  //similes: ["SELL TOKEN", "CHECK SELL TOKEN", "SELL NOW"],
+  similes: ["check"],
   description: "Selling at particular price point.",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
@@ -48,39 +50,66 @@ export const checkSell: Action = {
           continue;
         }
 
-        const priceIncrease =
-          ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100;
-        const priceDecrease =
-          ((trade.entryPrice - currentPrice) / trade.entryPrice) * 100;
+        const profitLossPercent = Math.round(
+          ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100
+        );
 
-        if (priceIncrease >= 30) {
+        if (profitLossPercent >= 30) {
           elizaLogger.log(
-            `✅ Verkaufe ${trade.symbol} mit +${priceIncrease.toFixed(
+            `✅ Verkaufe ${trade.symbol} mit +${profitLossPercent.toFixed(
               2
             )}% Gewinn!`
           );
           tokenMetricsProvider.updateExitPrice(
             trade.tokenAddress,
-            currentPrice
+            currentPrice,
+            profitLossPercent
           );
           // TODO: Implementiere Verkauf & Twitter-Update
           // TODO LUIGI: udatexitpreis  reinziehen
-        } else if (priceDecrease >= 20) {
+
+          const sellMemory: Memory = {
+            id: `${_message.id}-sell` as UUID,
+            agentId: _runtime.agentId,
+            userId: _message.userId,
+            roomId: _message.roomId,
+            createdAt: Date.now(),
+            content: {
+              text: `Selling token ${trade.tokenAddress}`,
+              action: "SELL_TOKEN",
+              tokenAddress: trade.tokenAddress,
+              source: "direct"
+            },
+          };
+
+          await _runtime.processActions(
+            sellMemory,
+            [sellMemory],
+            _state,
+            async (result) => {
+              if (result.action === "TOKEN_SOLD") {
+                elizaLogger.log("✅ Sell action completed successfully");
+              }
+              return [];
+            }
+          );
+        } else if (profitLossPercent <= -20) {
           elizaLogger.log(
-            `⛔ Verkaufe ${trade.symbol} mit -${priceDecrease.toFixed(
+            `⛔ Verkaufe ${trade.symbol} mit -${profitLossPercent.toFixed(
               2
             )}% Verlust!`
           );
           tokenMetricsProvider.updateExitPrice(
             trade.tokenAddress,
-            currentPrice
+            currentPrice,
+            profitLossPercent
           );
           // TODO: Implementiere Verkauf & Twitter-Update
         } else {
           elizaLogger.log(
-            `📈 ${trade.symbol} hat aktuell +${priceIncrease.toFixed(
+            `📈 ${trade.symbol} hat aktuell +${profitLossPercent.toFixed(
               2
-            )}% Gewinn und -${priceDecrease.toFixed(2)}% Verlust`
+            )}% Gewinn und -${profitLossPercent.toFixed(2)}% Verlust`
           );
         }
       }
@@ -171,7 +200,7 @@ export const checkSell: Action = {
       {
         user: "{{eliza}}",
         content: {
-          text: "I’m checking your portfolio for tokens that meet the sell criteria.",
+          text: "I'm checking your portfolio for tokens that meet the sell criteria.",
           action: "CHECK_SELL",
         },
       },

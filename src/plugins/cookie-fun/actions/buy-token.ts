@@ -31,20 +31,29 @@ export const buyToken: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
+      let tokenAddress: string;
+      let amountInEth: string;
 
-      const { tokenAddress, amountInEth } = _message.content;
-
-      if (!tokenAddress || !amountInEth) {
-        throw new Error("Missing required parameters");
+      // Try to get from content object first
+      if (typeof _message.content === 'object' && _message.content !== null) {
+        tokenAddress = (_message.content as { tokenAddress?: string }).tokenAddress;
+        amountInEth = (_message.content as { amountInEth?: string }).amountInEth;
       }
 
-      // Log the entire message object
-      elizaLogger.log("🔍 Full message:", {
-        message: _message,
-        contentType: typeof _message.content,
-        hasContent: !!_message.content,
-      });
+      // If not found, try to parse from text
+      if (!tokenAddress || !amountInEth) {
+        const text = _message.content.text as string;
+        // Match address (0x...) and ETH amount
+        const addressMatch = text.match(/0x[a-fA-F0-9]{40}/);
+        const amountMatch = text.match(/(\d+\.?\d*)\s*eth/i);
+        
+        tokenAddress = addressMatch?.[0];
+        amountInEth = amountMatch?.[1];
+      }
 
+      if (!tokenAddress || !amountInEth) {
+        throw new Error("Missing required parameters. Please specify token address and ETH amount.");
+      }
       
       // Make sure we're working with a valid number string
       const amountInWei = ethers.parseEther(amountInEth as string).toString();
@@ -71,7 +80,6 @@ export const buyToken: Action = {
       );
 
       // Execute the buy
-      elizaLogger.log("🔄 Calling trade executor...");
       const tradeResult = await tradeExecutor.buyToken(
         tokenAddress as string,
         amountInWei
@@ -102,7 +110,7 @@ export const buyToken: Action = {
       tokenMetricsProvider.upsertTokenMetrics(metrics);
 
       _callback({
-        text: `Successfully bought ${tokenAddress} for ${amountInEth} ETH`,
+        text: `Successfully bought ${tokenAddress} for ${amountInEth} ETH\nTransaction: https://arbiscan.io/tx/${tradeResult.tradeId}`.replace(/\n/g, ' '),
         action: "TOKEN_BOUGHT",
         data: tradeResult
       });
