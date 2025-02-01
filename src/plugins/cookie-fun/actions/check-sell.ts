@@ -64,6 +64,7 @@ export const checkSell: Action = {
             currentPrice
           );
           // TODO: Implementiere Verkauf & Twitter-Update
+          // TODO LUIGI: udatexitpreis  reinziehen
         } else if (priceDecrease >= 20) {
           elizaLogger.log(
             `⛔ Verkaufe ${trade.symbol} mit -${priceDecrease.toFixed(

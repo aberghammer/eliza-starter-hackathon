@@ -1,4 +1,4 @@
-import { elizaLogger, ICacheManager } from "@elizaos/core";
+import { elizaLogger, ICacheManager, UUID } from "@elizaos/core";
 import BetterSQLite3 from "better-sqlite3";
 
 import {
@@ -17,6 +17,7 @@ import {
 
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
+import { TradeExecutionProvider } from "../providers/trade-execution-provider";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -56,12 +57,13 @@ export const analyzeData: Action = {
       const agent = response.ok;
 
       // Token-Daten extrahieren (erstes Contract-Token nehmen)
-      const tokenAddress =
+      let tokenAddress =
         agent.contracts.length > 0
           ? agent.contracts[0].contractAddress
           : "UNKNOWN";
 
       // Daten für die Datenbank formatieren
+      tokenAddress = "0x912ce59144191c1204e64559fe8253a0e49e6548";//Luigi: Hack to be able to force new trades
       const tokenMetrics: TokenMetrics = {
         tokenAddress,
         symbol: agent.agentName.toUpperCase(), // Symbol aus AgentName ableiten
@@ -78,22 +80,52 @@ export const analyzeData: Action = {
 
       const existingTrade = tokenMetricsProvider
         .getActiveTrades()
-        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress);
+        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress +1 );//Luigi: Hack to avoid if loop for testing
 
       if (!existingTrade) {
-        tokenMetricsProvider.insertTokenMetrics(tokenMetrics);
+        //tokenMetricsProvider.insertTokenMetrics(tokenMetrics); //Luigi disable database writing to allow to buy token multiple times for now
         elizaLogger.log(
           `✅ Neuer Trade für ${tokenMetrics.tokenAddress} angelegt.`
         );
 
         if (tokenMetrics.buySignal) {
-          // Token kaufen
+
           const currentStats = await dexscreenerProvider.fetchTokenPrice(
             tokenAddress
           );
-          elizaLogger.log("🚀 Token gekauft:", currentStats.price);
           buyPrice = currentStats.price;
-          //TODO: send tweet
+          // Create a buy token memory
+          const buyMemory: Memory = {
+            id: `${_message.id}-buy` as UUID,
+            agentId: _runtime.agentId,
+            userId: _message.userId,
+            roomId: _message.roomId,
+            createdAt: Date.now(),
+            content: {
+              text: `Buying token ${tokenMetrics.tokenAddress}`,
+              action: "BUY_TOKEN",
+              tokenAddress: tokenMetrics.tokenAddress, //TODO LUIGI: Hardcoded tokenaddress of buy
+              amountInEth: "0.00001", //TODO LUIGI: Hardcoded amount of buy
+              source: "direct"
+            },
+          };
+
+          elizaLogger.log("🔍 Debug - Buy Memory Content:", buyMemory.content);
+
+          // Execute the buy action
+          await _runtime.processActions(
+            buyMemory,
+            [buyMemory],
+            _state,
+            async (result) => {
+              if (result.action === "TOKEN_BOUGHT") {
+                elizaLogger.log("✅ Buy action completed successfully");
+              } else if (result.action === "BUY_ERROR") {
+                elizaLogger.error("❌ Buy action failed");
+              }
+              return [];
+            }
+          );
         }
       } else {
         elizaLogger.log(
