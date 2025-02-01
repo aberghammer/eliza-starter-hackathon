@@ -12,34 +12,7 @@ import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
 
-interface BuyMemoryContent {
-  text: string;
-  action: string;
-  tokenAddress: string;
-  amountInEth: string;
-  source: string;
-  attachments?: any[];
-}
 
-function isBuyMemoryContent(content: any): content is BuyMemoryContent {
-  elizaLogger.log("🔍 Checking content:", content);
-  
-  // More lenient check - just verify the required fields exist
-  const hasRequiredFields = 
-    typeof content === 'object' &&
-    typeof content.tokenAddress === 'string' &&
-    typeof content.amountInEth === 'string';
-  
-  elizaLogger.log("🔍 Content validation:", { 
-    hasRequiredFields,
-    fields: {
-      tokenAddress: typeof content?.tokenAddress,
-      amountInEth: typeof content?.amountInEth
-    }
-  });
-  
-  return hasRequiredFields;
-}
 
 export const buyToken: Action = {
   name: "BUY_TOKEN",
@@ -47,7 +20,7 @@ export const buyToken: Action = {
   description: "Buys a token on Arbitrum using SushiSwap",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return isBuyMemoryContent(_message.content);
+    return true; 
   },
 
   handler: async (
@@ -58,16 +31,12 @@ export const buyToken: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
-      if (!isBuyMemoryContent(_message.content)) {
-        throw new Error("Invalid content format");
-      }
+
       const { tokenAddress, amountInEth } = _message.content;
 
       if (!tokenAddress || !amountInEth) {
         throw new Error("Missing required parameters");
       }
-
-      elizaLogger.log("🔍 Using parameters:", { tokenAddress, amountInEth });
 
       // Log the entire message object
       elizaLogger.log("🔍 Full message:", {
@@ -76,19 +45,10 @@ export const buyToken: Action = {
         hasContent: !!_message.content,
       });
 
-      elizaLogger.log("🔍 Raw input:", {
-        tokenAddress,
-        rawAmount: amountInEth
-      });
       
       // Make sure we're working with a valid number string
       const amountInWei = ethers.parseEther(amountInEth as string).toString();
       
-      elizaLogger.log("🔍 Debug - Parsed values:", {
-        tokenAddress,
-        amountInEth,
-        amountInWei
-      });
 
       elizaLogger.log(`🔄 Starting token purchase for ${tokenAddress} with ${amountInEth} ETH`);
 
@@ -113,7 +73,7 @@ export const buyToken: Action = {
       // Execute the buy
       elizaLogger.log("🔄 Calling trade executor...");
       const tradeResult = await tradeExecutor.buyToken(
-        tokenAddress,
+        tokenAddress as string,
         amountInWei
       );
 
@@ -121,14 +81,13 @@ export const buyToken: Action = {
         throw new Error("Trade execution returned null result");
       }
 
-      elizaLogger.log("✅ Token purchase successful:", tradeResult);
 
       // Update database with trade info
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
 
       const metrics = {
-        tokenAddress: tokenAddress,
+        tokenAddress: tokenAddress as string,
         symbol: tradeResult.symbol,
         mindshare: 0, // These will be updated by analyze-data
         sentimentScore: 0,

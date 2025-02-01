@@ -26,13 +26,6 @@ export class TradeExecutionProvider {
     amountInWei: string
   ): Promise<TradeLog | null> {
     try {
-      elizaLogger.log(`🔄 Trade execution details:`, {
-        tokenAddress,
-        amountInWei,
-        amountInEth: ethers.formatEther(amountInWei),
-        routerAddress: this.ROUTER_ADDRESS,
-        wethAddress: this.WETH_ADDRESS
-      });
 
       // Get token info
       const tokenAbi = ["function symbol() view returns (string)"];
@@ -52,12 +45,6 @@ export class TradeExecutionProvider {
       const amounts = await router.getAmountsOut(amountInWei, path);
       const amountOutMin = amounts[1] - (amounts[1] * BigInt(Math.floor(this.SLIPPAGE * 100)) / BigInt(10000));
 
-      elizaLogger.log("🔄 Preparing transaction parameters...", {
-        amountOutMin: amountOutMin.toString(),
-        expectedOutput: amounts[1].toString(),
-        slippage: `${this.SLIPPAGE}%`
-      });
-      
       const tx = await router.swapExactETHForTokens(
         amountOutMin,
         path,
