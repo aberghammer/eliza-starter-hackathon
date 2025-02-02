@@ -38,12 +38,14 @@ export const analyzeData: Action = {
     try {
       elizaLogger.log("📡 Analyzer started...");
 
-      elizaLogger.log("📡 TODO: NOTHING IMPLEMENTED,YET...");
 
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
       const cookieProvider = new CookieApiProvider(_runtime);
       const dexscreenerProvider = new DexscreenerProvider();
+
+      tokenMetricsProvider.cleanupAllTokenMetrics(); // Clean existing data, so we can keep trading the same token multiple times
+      elizaLogger.log("Database cleaned, starting fresh analysis...");
 
       const response = await cookieProvider.fetchAgentByTwitter("aixbt_agent");
 
@@ -73,17 +75,17 @@ export const analyzeData: Action = {
         priceChange24h: agent.priceDeltaPercent || 0,
         holderDistribution: `Holders: ${agent.holdersCount} (Change: ${agent.holdersCountDeltaPercent}%)`,
         timestamp: new Date().toISOString(),
-        buySignal: agent.mindshareDeltaPercent > 10, // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
+        buySignal: true,  // agent.mindshareDeltaPercent > 10 // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
       };
 
       let buyPrice = 0;
 
       const existingTrade = tokenMetricsProvider
         .getActiveTrades()
-        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress +1 );//Luigi: Hack to avoid if loop for testing
+        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress);//+1 Luigi sloppy: Hack to avoid if loop for testing
 
       if (!existingTrade) {
-        //tokenMetricsProvider.insertTokenMetrics(tokenMetrics); //Luigi disable database writing to allow to buy token multiple times for now
+        //tokenMetricsProvider.insertTokenMetrics(tokenMetrics); //Luigi sloppy: disable database writing to allow to buy token multiple times for now
         elizaLogger.log(
           `✅ Neuer Trade für ${tokenMetrics.tokenAddress} angelegt.`
         );
@@ -104,13 +106,13 @@ export const analyzeData: Action = {
             content: {
               text: `Buying token ${tokenMetrics.tokenAddress}`,
               action: "BUY_TOKEN",
-              tokenAddress: tokenMetrics.tokenAddress, //TODO LUIGI: Hardcoded tokenaddress of buy
-              amountInEth: "0.00001", //TODO LUIGI: Hardcoded amount of buy
+              tokenAddress: tokenMetrics.tokenAddress, 
+              amountInEth: "0.00001", //TODO LUIGI sloppy: Hardcoded amount of buy
               source: "direct"
             },
           };
 
-          elizaLogger.log("🔍 Debug - Buy Memory Content:", buyMemory.content);
+          
 
           // Execute the buy action
           await _runtime.processActions(
@@ -118,8 +120,18 @@ export const analyzeData: Action = {
             [buyMemory],
             _state,
             async (result) => {
-              if (result.action === "TOKEN_BOUGHT") {
+              if (result.action === "TOKEN_BOUGHT" && result.data) {
+                const tradeData = result.data as { symbol: string; price: number };
                 elizaLogger.log("✅ Buy action completed successfully");
+                
+                // Update metrics with actual trade data from result
+                tokenMetrics.symbol = tradeData.symbol;
+                tokenMetrics.entryPrice = tradeData.price;
+                
+                // Use upsert instead of insert to handle duplicates
+                tokenMetricsProvider.upsertTokenMetrics(tokenMetrics);
+                
+                elizaLogger.log(`✅ Trade metrics saved for ${tokenMetrics.symbol} at price ${tokenMetrics.entryPrice}`);
               } else if (result.action === "BUY_ERROR") {
                 elizaLogger.error("❌ Buy action failed");
               }
@@ -134,10 +146,6 @@ export const analyzeData: Action = {
       }
       // Daten in die Datenbank speichern
       // // Metriken speichern
-
-      tokenMetrics.entryPrice = buyPrice;
-      // // Letzte Token-Metriken abrufen
-      tokenMetricsProvider.upsertTokenMetrics(tokenMetrics);
 
       //____________________________________________________________________________________
 

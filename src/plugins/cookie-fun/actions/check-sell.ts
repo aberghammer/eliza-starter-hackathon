@@ -43,31 +43,39 @@ export const checkSell: Action = {
         const currentPriceData = await dexscreenerProvider.fetchTokenPrice(
           trade.tokenAddress
         );
-        const currentPrice = currentPriceData.price;
 
-        if (!currentPrice) {
-          elizaLogger.error(`⚠️ Kein Preis für ${trade.tokenAddress} gefunden`);
+        elizaLogger.log("DexScreener response:", currentPriceData);
+
+        if (!currentPriceData || !currentPriceData.price) {
+          elizaLogger.error(`⚠️ No price data found for ${trade.tokenAddress}`);
+          continue;
+        }
+
+        // Get current price in ETH (convert from USD using current ETH price ~$3000)
+        const ETH_PRICE = 3000; // This should be fetched dynamically
+        const currentPriceInEth = currentPriceData.price / ETH_PRICE;
+
+        if (!currentPriceInEth || !trade.entryPrice) {
+          elizaLogger.error(`⚠️ Missing price data for ${trade.tokenAddress} (Current: ${currentPriceInEth}, Entry: ${trade.entryPrice})`);
           continue;
         }
 
         const profitLossPercent = Math.round(
-          ((currentPrice - trade.entryPrice) / trade.entryPrice) * 100
+          ((currentPriceInEth - trade.entryPrice) / trade.entryPrice) * 100
         );
 
-        if (profitLossPercent >= 30) {
-          elizaLogger.log(
-            `✅ Verkaufe ${trade.symbol} mit +${profitLossPercent.toFixed(
-              2
-            )}% Gewinn!`
-          );
-          tokenMetricsProvider.updateExitPrice(
-            trade.tokenAddress,
-            currentPrice,
-            profitLossPercent
-          );
-          // TODO: Implementiere Verkauf & Twitter-Update
-          // TODO LUIGI: udatexitpreis  reinziehen
+        elizaLogger.log(`📊 ${trade.symbol} current stats:`, {
+          entryPrice: trade.entryPrice,
+          currentPriceEth: currentPriceInEth,
+          currentPriceUsd: currentPriceData.price,
+          liquidity: currentPriceData.liquidity,
+          profitLoss: `${profitLossPercent}%`
+        });
 
+        if (profitLossPercent >= 0) { //30
+          elizaLogger.log(`✅ Selling ${trade.symbol} with +${profitLossPercent.toFixed(2)}% profit!`);
+
+          // Create sell memory
           const sellMemory: Memory = {
             id: `${_message.id}-sell` as UUID,
             agentId: _runtime.agentId,
@@ -75,43 +83,74 @@ export const checkSell: Action = {
             roomId: _message.roomId,
             createdAt: Date.now(),
             content: {
-              text: `Selling token ${trade.tokenAddress}`,
+              text: `Selling token ${trade.tokenAddress} at +${profitLossPercent}% profit`,
               action: "SELL_TOKEN",
               tokenAddress: trade.tokenAddress,
               source: "direct"
             },
           };
 
+          // Execute the sell
           await _runtime.processActions(
             sellMemory,
             [sellMemory],
             _state,
             async (result) => {
               if (result.action === "TOKEN_SOLD") {
-                elizaLogger.log("✅ Sell action completed successfully");
+                elizaLogger.log(`✅ ${profitLossPercent >= 0 ? 'Profit' : 'Loss'} take completed successfully (${profitLossPercent}%)`);
+              } else if (result.action === "SELL_ERROR") {
+                elizaLogger.error("❌ Sale failed");
               }
               return [];
             }
           );
-        } else if (profitLossPercent <= -20) {
-          elizaLogger.log(
-            `⛔ Verkaufe ${trade.symbol} mit -${profitLossPercent.toFixed(
-              2
-            )}% Verlust!`
+        } else if (profitLossPercent <= -1) { //20
+          elizaLogger.log(`⛔ Selling ${trade.symbol} with ${profitLossPercent.toFixed(2)}% loss!`);
+
+          // Create sell memory for stop loss
+          const sellMemory: Memory = {
+            id: `${_message.id}-sell` as UUID,
+            agentId: _runtime.agentId,
+            userId: _message.userId,
+            roomId: _message.roomId,
+            createdAt: Date.now(),
+            content: {
+              text: `Selling token ${trade.tokenAddress} at ${profitLossPercent}% loss (stop loss)`,
+              action: "SELL_TOKEN",
+              tokenAddress: trade.tokenAddress,
+              source: "direct"
+            },
+          };
+
+          // Execute the stop loss
+          await _runtime.processActions(
+            sellMemory,
+            [sellMemory],
+            _state,
+            async (result) => {
+              if (result.action === "TOKEN_SOLD") {
+                elizaLogger.log("✅ Stop loss executed successfully");
+              } else if (result.action === "SELL_ERROR") {
+                elizaLogger.error("❌ Stop loss failed");
+              }
+              return [];
+            }
           );
-          tokenMetricsProvider.updateExitPrice(
-            trade.tokenAddress,
-            currentPrice,
-            profitLossPercent
-          );
-          // TODO: Implementiere Verkauf & Twitter-Update
         } else {
+          const profitLossText = profitLossPercent >= 0 
+            ? `+${profitLossPercent.toFixed(2)}% Gewinn` 
+            : `${profitLossPercent.toFixed(2)}% Verlust`;
+            
           elizaLogger.log(
-            `📈 ${trade.symbol} hat aktuell +${profitLossPercent.toFixed(
-              2
-            )}% Gewinn und -${profitLossPercent.toFixed(2)}% Verlust`
+            `📈 ${trade.symbol} hat aktuell ${profitLossText}`
           );
         }
+
+        elizaLogger.log(`Found price on ${trade.symbol}:`, {
+          priceNative: currentPriceInEth,
+          priceUsd: currentPriceData.price,
+          liquidity: currentPriceData.liquidity
+        });
       }
 
       //TODO:

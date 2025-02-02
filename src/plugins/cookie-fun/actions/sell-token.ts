@@ -102,7 +102,7 @@ export const sellToken: Action = {
         throw new Error("Trade execution returned null result");
       }
 
-      // Calculate profit/loss percentage
+      // Calculate profit/loss percentage and update database
       const trade = activeTrades.find(t => t.tokenAddress === tokenAddress);
       if (!trade || !trade.entryPrice) {
         throw new Error("Could not find entry price for trade");

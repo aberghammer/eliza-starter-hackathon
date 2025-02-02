@@ -25,43 +25,37 @@ export const housekeeping: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
-      elizaLogger.log("📡 Running everything every few minutes");
+      const runHousekeeping = async () => {
+        elizaLogger.log("📡 Running housekeeping tasks...");
 
-      //TODO:
+        // Actions to run periodically
+        const actionsToRun = ["ANALYZE_DATA", "CHECK_SELL"]; 
+        const actionMemories: Memory[] = actionsToRun.map((actionName) => ({
+          id: `${_message.id}-${actionName}` as UUID,
+          agentId: _runtime.agentId,
+          userId: _message.userId,
+          roomId: _message.roomId,
+          createdAt: Date.now(),
+          content: {
+            text: `Executing ${actionName}`,
+            action: actionName,
+          },
+        }));
 
-      // Actions definieren
-      const actionsToRun = ["ANALYZE_DATA", "TWEET_MINDSHARE"];
-      const actionMemories: Memory[] = actionsToRun.map((actionName) => ({
-        id: `${_message.id}-${actionName}` as UUID,
-        agentId: _runtime.agentId,
-        userId: _message.userId,
-        roomId: _message.roomId,
-        createdAt: Date.now(),
-        content: {
-          text: `Executing ${actionName}`,
-          action: actionName, // **Hier liegt die Änderung!** 🔥
-        },
-      }));
+        await _runtime.processActions(
+          _message,
+          actionMemories,
+          _state,
+          _callback
+        );
+      };
 
-      // `processActions()` ausführen mit den Dummy-Responses
-      await _runtime.processActions(
-        _message,
-        actionMemories,
-        _state,
-        _callback
-      );
+      // Initial run
+      await runHousekeeping();
 
-      elizaLogger.log("✅ All actions completed successfully!");
-
-      // run in loop and call
-      // await runtime.callAction("SECOND_ACTION", { someData: "data" });
-      // also eigentlich sollte es dann reichen hier analyzeData aufzurufen und dann checkSell
-      // keine Ahnung ob das so geht lol...
-
-      _callback({
-        text: `🚀 Everything is running`,
-        action: "NOTHING",
-      });
+      // Set up interval (e.g., every 5 minutes)
+      const INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+      setInterval(runHousekeeping, INTERVAL);
 
       return true;
     } catch (error) {

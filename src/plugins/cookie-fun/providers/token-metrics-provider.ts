@@ -199,4 +199,14 @@ export class TokenMetricsProvider {
       return false;
     }
   }
+
+  public cleanupAllTokenMetrics(): void {
+    const sql = `DELETE FROM token_metrics;`;
+    try {
+      this.db.prepare(sql).run();
+      console.log("🧹 Cleaned all token metrics from database");
+    } catch (error) {
+      console.error("❌ Error cleaning token metrics:", error);
+    }
+  }
 }
