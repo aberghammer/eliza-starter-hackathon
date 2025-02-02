@@ -28,7 +28,7 @@ export const housekeeping: Action = {
 
       
       //-------------------------------Stellschrauben--------------------------------
-      const loopAfterXMinutes = 1; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      const loopAfterXMinutes = 60; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
       //-------------------------------Stellschrauben--------------------------------
 
 
