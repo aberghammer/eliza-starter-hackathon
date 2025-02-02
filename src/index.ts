@@ -5,6 +5,11 @@ import {
   settings,
   stringToUuid,
   type Character,
+  type IAgentRuntime,
+  type Memory,
+  type UUID,
+  type State,
+  type Content
 } from "@elizaos/core";
 import { bootstrapPlugin } from "@elizaos/plugin-bootstrap";
 import { createNodePlugin } from "@elizaos/plugin-node";
@@ -98,15 +103,69 @@ async function startAgent(character: Character, directClient: DirectClient) {
     // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
 
+    // Start housekeeping for this agent
+    await setupHousekeeping(runtime);
+
     return runtime;
   } catch (error) {
-    elizaLogger.error(
-      `Error starting agent for character ${character.name}:`,
-      error
-    );
-    console.error(error);
+    elizaLogger.error(`Error starting agent for character ${character.name}:`, error);
     throw error;
   }
+}
+
+// Set up background housekeeping task
+async function setupHousekeeping(runtime: IAgentRuntime) {
+  const INTERVAL = 5 * 60 * 1000;
+  
+  const runTasks = async () => {
+    try {
+      const content: Content = {
+        text: "Running periodic housekeeping",
+        action: "HOUSEKEEPING",
+        source: "system",
+        attachments: []
+      };
+
+      const message: Memory = {
+        id: stringToUuid("housekeeping"),
+        agentId: runtime.agentId,
+        userId: stringToUuid("system"),
+        roomId: stringToUuid("background"),
+        createdAt: Date.now(),
+        content,        
+      };
+
+      const state: State = {
+        bio: "",
+        lore: "",
+        messageDirections: "",
+        postDirections: "",
+        conversationId: stringToUuid("housekeeping"),
+        messageId: stringToUuid("housekeeping"),
+        context: {},
+        memory: [],
+        tokens: 0,
+        roomId: stringToUuid("background"),
+        actors: "",
+        recentMessages: "",
+        recentMessagesData: []
+      };
+
+      await runtime.processActions(
+        message,
+        [message],
+        state,
+        () => Promise.resolve([])
+      );
+
+      elizaLogger.log("✅ Housekeeping tasks completed successfully");
+    } catch (error) {
+      elizaLogger.error("Background task error:", error);
+    }
+  };
+
+  await runTasks();
+  setInterval(runTasks, INTERVAL);
 }
 
 const checkPortAvailable = (port: number): Promise<boolean> => {

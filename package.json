@@ -8,7 +8,8 @@
     "start": "tsc && node --loader ts-node/esm src/index.ts",
     "clean": "./scripts/clean.sh",
     "start:service:all": "pm2 start pnpm --name=\"all\" --restart-delay=3000 --max-restarts=10 -- run start:all",
-    "stop:service:all": "pm2 stop all"
+    "stop:service:all": "pm2 stop all",
+    "rerun": "pnpm install && pnpm build && pnpm start"
   },
   "dependencies": {
     "@elizaos/adapter-postgres": "0.1.7",
@@ -28,6 +29,7 @@
     "agent-twitter-client": "^0.0.18",
     "amqplib": "0.10.5",
     "better-sqlite3": "11.5.0",
+    "ethers": "^6.13.5",
     "fs": "0.0.1-security",
     "net": "1.0.2",
     "path": "0.12.7",
@@ -50,6 +52,6 @@
   "devDependencies": {
     "ts-node": "10.9.2",
     "tsup": "8.3.5",
-    "typescript": "5.6.3"
+    "typescript": "5.0.4"
   }
 }
