@@ -28,7 +28,7 @@ export const housekeeping: Action = {
 
       
       //-------------------------------Stellschrauben--------------------------------
-      const loopAfterXMinutes = 60; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      const loopAfterXMinutes = 1; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
       //-------------------------------Stellschrauben--------------------------------
 
 
@@ -66,12 +66,11 @@ export const housekeeping: Action = {
             }
           );
         }
-
-        elizaLogger.log("✅ Housekeeping tasks completed successfully");
       };
 
       // Initial run
       await runHousekeeping();
+      elizaLogger.log("✅ Housekeeping tasks completed successfully");
 
       // Run every 5 minutes
       const INTERVAL = loopAfterXMinutes * 60 * 1000; // 5 minutes in milliseconds
