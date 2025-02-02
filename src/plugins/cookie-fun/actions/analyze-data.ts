@@ -38,14 +38,23 @@ export const analyzeData: Action = {
     try {
       elizaLogger.log("📡 Analyzer started...");
 
+      //-------------------------------Stellschrauben--------------------------------
+      const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      const cleanDatabase = false; //Cleans all entries into the database, to delete old mistakes or trades that are in the way
+      //-------------------------------Stellschrauben--------------------------------
+
 
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
       const cookieProvider = new CookieApiProvider(_runtime);
       const dexscreenerProvider = new DexscreenerProvider();
 
-      tokenMetricsProvider.cleanupAllTokenMetrics(); // Clean existing data, so we can keep trading the same token multiple times
-      elizaLogger.log("Database cleaned, starting fresh analysis...");
+      if(cleanDatabase){
+        tokenMetricsProvider.cleanupAllTokenMetrics(); // Clean existing data, so we can keep trading the same token multiple times
+        elizaLogger.log("Database cleaned, starting fresh analysis...");
+      }
+
+
 
       const response = await cookieProvider.fetchAgentByTwitter("aixbt_agent");
 
@@ -65,7 +74,7 @@ export const analyzeData: Action = {
           : "UNKNOWN";
 
       // Daten für die Datenbank formatieren
-      tokenAddress = "0x912ce59144191c1204e64559fe8253a0e49e6548";//Luigi: Hack to be able to force new trades
+      tokenAddress = hardcodedTokenToBuy || tokenAddress; //Takes hardcodedTokenToBuy if its filled, otherwise just uses the tokenaddress given by the agent
       const tokenMetrics: TokenMetrics = {
         tokenAddress,
         symbol: agent.agentName.toUpperCase(), // Symbol aus AgentName ableiten

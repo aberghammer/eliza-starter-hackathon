@@ -1,4 +1,4 @@
-import { elizaLogger, ICacheManager } from "@elizaos/core";
+import { elizaLogger } from "@elizaos/core";
 import {
   ActionExample,
   HandlerCallback,
@@ -32,6 +32,10 @@ export const checkSell: Action = {
     try {
       elizaLogger.log("📡 Checking for gainz... or losses whatever 🐸");
 
+      //-------------------------------Stellschrauben--------------------------------
+      const alwaysSell = false; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      //-------------------------------Stellschrauben--------------------------------
+
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
       const dexscreenerProvider = new DexscreenerProvider();
@@ -46,14 +50,18 @@ export const checkSell: Action = {
 
         elizaLogger.log("DexScreener response:", currentPriceData);
 
-        if (!currentPriceData || !currentPriceData.price) {
-          elizaLogger.error(`⚠️ No price data found for ${trade.tokenAddress}`);
+        // Find the WETH pair (that's the one with ETH price)
+        const wethPair = currentPriceData.pairs?.find(
+          p => p.quoteToken.symbol === "WETH"
+        );
+
+        if (!wethPair) {
+          elizaLogger.error(`⚠️ No WETH pair found for ${trade.tokenAddress}`);
           continue;
         }
 
-        // Get current price in ETH (convert from USD using current ETH price ~$3000)
-        const ETH_PRICE = 3000; // This should be fetched dynamically
-        const currentPriceInEth = currentPriceData.price / ETH_PRICE;
+        // Use the native (ETH) price directly from the WETH pair
+        const currentPriceInEth = parseFloat(wethPair.priceNative);
 
         if (!currentPriceInEth || !trade.entryPrice) {
           elizaLogger.error(`⚠️ Missing price data for ${trade.tokenAddress} (Current: ${currentPriceInEth}, Entry: ${trade.entryPrice})`);
@@ -67,13 +75,24 @@ export const checkSell: Action = {
         elizaLogger.log(`📊 ${trade.symbol} current stats:`, {
           entryPrice: trade.entryPrice,
           currentPriceEth: currentPriceInEth,
-          currentPriceUsd: currentPriceData.price,
-          liquidity: currentPriceData.liquidity,
+          currentPriceUsd: wethPair.priceUsd,
+          liquidity: wethPair.liquidity.usd,
           profitLoss: `${profitLossPercent}%`
         });
 
-        if (profitLossPercent >= 0) { //30
+        // Before the sell checks, calculate the message once
+        const profitLossText = profitLossPercent >= 0 
+          ? `+$profitLossPercent% Gewinn`
+          : `$profitLossPercent% Verlust`;
+
+        // Just show current status
+        elizaLogger.log(`📈 ${trade.symbol} hat aktuell ${profitLossText}`);
+
+        if (alwaysSell || profitLossPercent >= 30) { 
           elizaLogger.log(`✅ Selling ${trade.symbol} with +${profitLossPercent.toFixed(2)}% profit!`);
+          elizaLogger.log(
+            `${profitLossPercent >= 0 ? '✅' : '⛔'} Selling ${trade.symbol} with ${profitLossText}!`
+          );
 
           // Create sell memory
           const sellMemory: Memory = {
@@ -104,7 +123,7 @@ export const checkSell: Action = {
               return [];
             }
           );
-        } else if (profitLossPercent <= -1) { //20
+        } else if (alwaysSell || profitLossPercent <= -20) { 
           elizaLogger.log(`⛔ Selling ${trade.symbol} with ${profitLossPercent.toFixed(2)}% loss!`);
 
           // Create sell memory for stop loss
@@ -136,38 +155,11 @@ export const checkSell: Action = {
               return [];
             }
           );
-        } else {
-          const profitLossText = profitLossPercent >= 0 
-            ? `+${profitLossPercent.toFixed(2)}% Gewinn` 
-            : `${profitLossPercent.toFixed(2)}% Verlust`;
-            
-          elizaLogger.log(
-            `📈 ${trade.symbol} hat aktuell ${profitLossText}`
-          );
         }
-
-        elizaLogger.log(`Found price on ${trade.symbol}:`, {
-          priceNative: currentPriceInEth,
-          priceUsd: currentPriceData.price,
-          liquidity: currentPriceData.liquidity
-        });
       }
 
-      //TODO:
-
-      //const tradeExecutionProvider = new TradeExecutionProvider(...);
-      //const holdingList = tradeExecutionProvider.checkMyHoldings();
-      //holdingList.map((holding) => {
-      // check if we should sell
-      // if (holding.price > ... || < ... sell ) { }      //
-      // const coins sold = ...
-
-      // token wird verkauft wenn die analyse positiv ist und dann wird getwittert
-      // const twitterProvider = new TwitterProvider(...);
-      // if coins sold > 0  && twitterProvider.tweet("I just bought the token");
-
       _callback({
-        text: `🚀 Data sucessfully analyzed`,
+        text: `🚀 Data successfully analyzed`,
         action: "NOTHING",
       });
 
@@ -175,10 +167,9 @@ export const checkSell: Action = {
     } catch (error) {
       console.error("❌ Error analyzing:", error);
       _callback({
-        text: "There was an error: .",
+        text: "There was an error.",
         action: "SELL_ERROR",
       });
-
       return false;
     }
   },
@@ -188,73 +179,13 @@ export const checkSell: Action = {
       {
         user: "{{user1}}",
         content: {
-          text: "Can you check if it's time to sell my tokens?",
+          text: "Check if we should sell any tokens.",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Let me analyze your holdings for potential sales opportunities.",
-          action: "CHECK_SELL",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user2}}",
-        content: {
-          text: "Sell my tokens if they meet the criteria.",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Checking your tokens for selling opportunities based on your criteria.",
-          action: "CHECK_SELL",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user3}}",
-        content: {
-          text: "Are there any tokens to sell?",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Analyzing your holdings to determine if any tokens should be sold.",
-          action: "CHECK_SELL",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user4}}",
-        content: {
-          text: "Look for tokens with profit or loss triggers and sell them.",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "I'm checking your portfolio for tokens that meet the sell criteria.",
-          action: "CHECK_SELL",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user5}}",
-        content: {
-          text: "Can you trigger the sell check for my holdings?",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Sure! Initiating the sell check for your tokens.",
+          text: "Analyzing holdings for potential sell opportunities.",
           action: "CHECK_SELL",
         },
       },
