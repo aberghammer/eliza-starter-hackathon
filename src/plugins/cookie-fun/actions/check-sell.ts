@@ -50,113 +50,90 @@ export const checkSell: Action = {
 
         elizaLogger.log("DexScreener response:", currentPriceData);
 
-        // Find the WETH pair (that's the one with ETH price)
-        const wethPair = currentPriceData.pairs?.find(
-          p => p.quoteToken.symbol === "WETH"
-        );
+        if (trade.chainId === 42161) {
+          elizaLogger.log("🚀 Arbitrum chain detected");
 
-        if (!wethPair) {
-          elizaLogger.error(`⚠️ No WETH pair found for ${trade.tokenAddress}`);
-          continue;
-        }
-
-        // Use the native (ETH) price directly from the WETH pair
-        const currentPriceInEth = parseFloat(wethPair.priceNative);
-
-        if (!currentPriceInEth || !trade.entryPrice) {
-          elizaLogger.error(`⚠️ Missing price data for ${trade.tokenAddress} (Current: ${currentPriceInEth}, Entry: ${trade.entryPrice})`);
-          continue;
-        }
-
-        const profitLossPercent = Math.round(
-          ((currentPriceInEth - trade.entryPrice) / trade.entryPrice) * 100
-        );
-
-        elizaLogger.log(`📊 ${trade.symbol} current stats:`, {
-          entryPrice: trade.entryPrice,
-          currentPriceEth: currentPriceInEth,
-          currentPriceUsd: wethPair.priceUsd,
-          liquidity: wethPair.liquidity.usd,
-          profitLoss: `${profitLossPercent}%`
-        });
-
-        // Before the sell checks, calculate the message once
-        const profitLossText = profitLossPercent >= 0 
-          ? `+${profitLossPercent}% Gewinn`
-          : `${profitLossPercent}% Verlust`;
-
-        // Just show current status
-        elizaLogger.log(`📈 ${trade.symbol} hat aktuell ${profitLossText}`);
-
-        if (alwaysSell || profitLossPercent >= 30) { 
-          elizaLogger.log(`✅ Selling ${trade.symbol} with +${profitLossPercent.toFixed(2)}% profit!`);
-          elizaLogger.log(
-            `${profitLossPercent >= 0 ? '✅' : '⛔'} Selling ${trade.symbol} with ${profitLossText}!`
+          const wethPair = currentPriceData.pairs?.find(
+            (p) => p.quoteToken.symbol === "WETH"
           );
 
-          // Create sell memory
-          const sellMemory: Memory = {
-            id: `${_message.id}-sell` as UUID,
-            agentId: _runtime.agentId,
-            userId: _message.userId,
-            roomId: _message.roomId,
-            createdAt: Date.now(),
-            content: {
-              text: `Selling token ${trade.tokenAddress} at +${profitLossPercent}% profit`,
-              action: "SELL_TOKEN",
-              tokenAddress: trade.tokenAddress,
-              source: "direct"
-            },
-          };
+          if (!wethPair) {
+            elizaLogger.error(
+              `⚠️ No WETH pair found for ${trade.tokenAddress}`
+            );
+            continue;
+          }
 
-          // Execute the sell
-          await _runtime.processActions(
-            sellMemory,
-            [sellMemory],
-            _state,
-            async (result) => {
-              if (result.action === "TOKEN_SOLD") {
-                elizaLogger.log(`✅ ${profitLossPercent >= 0 ? 'Profit' : 'Loss'} take completed successfully (${profitLossPercent}%)`);
-              } else if (result.action === "SELL_ERROR") {
-                elizaLogger.error("❌ Sale failed");
-              }
-              return [];
-            }
+          // Use the native (ETH) price directly from the WETH pair
+          const currentPriceInEth = parseFloat(wethPair.priceNative);
+
+          if (!currentPriceInEth || !trade.entryPrice) {
+            elizaLogger.error(
+              `⚠️ Missing price data for ${trade.tokenAddress} (Current: ${currentPriceInEth}, Entry: ${trade.entryPrice})`
+            );
+            continue;
+          }
+
+          const profitLossPercent = Math.round(
+            ((currentPriceInEth - trade.entryPrice) / trade.entryPrice) * 100
           );
-        } else if (alwaysSell || profitLossPercent <= -20) { 
-          elizaLogger.log(`⛔ Selling ${trade.symbol} with ${profitLossPercent.toFixed(2)}% loss!`);
 
-          // Create sell memory for stop loss
-          const sellMemory: Memory = {
-            id: `${_message.id}-sell` as UUID,
-            agentId: _runtime.agentId,
-            userId: _message.userId,
-            roomId: _message.roomId,
-            createdAt: Date.now(),
-            content: {
-              text: `Selling token ${trade.tokenAddress} at ${profitLossPercent}% loss (stop loss)`,
-              action: "SELL_TOKEN",
-              tokenAddress: trade.tokenAddress,
-              source: "direct"
-            },
-          };
+          if (alwaysSell || profitLossPercent >= 30) {
+            trade.sellSignal = true;
 
-          // Execute the stop loss
-          await _runtime.processActions(
-            sellMemory,
-            [sellMemory],
-            _state,
-            async (result) => {
-              if (result.action === "TOKEN_SOLD") {
-                elizaLogger.log("✅ Stop loss executed successfully");
-              } else if (result.action === "SELL_ERROR") {
-                elizaLogger.error("❌ Stop loss failed");
-              }
-              return [];
-            }
-          );
+            // Update the token metrics
+            tokenMetricsProvider.upsertTokenMetrics(trade);
+
+            elizaLogger.log(
+              `✅ Selling ${trade.symbol} with +${profitLossPercent.toFixed(
+                2
+              )}% profit!`
+            );
+
+            // Before the sell checks, calculate the message once
+            const profitLossText =
+              profitLossPercent >= 0
+                ? `+${profitLossPercent}% Gewinn`
+                : `${profitLossPercent}% Verlust`;
+
+            elizaLogger.log(
+              `${profitLossPercent >= 0 ? "✅" : "⛔"} Selling ${
+                trade.symbol
+              } with ${profitLossText}!`
+            );
+          }
+
+          // } else if solana chain
+        } else {
+          elizaLogger.error("❌ Unsupported chain detected");
         }
       }
+      const sellMemory: Memory = {
+        id: `${_message.id}-sell` as UUID,
+        agentId: _runtime.agentId,
+        userId: _message.userId,
+        roomId: _message.roomId,
+        createdAt: Date.now(),
+        content: {
+          text: `Selling tokens`,
+          action: "SELL_TOKEN",
+        },
+      };
+
+      // Execute the stop loss
+      await _runtime.processActions(
+        sellMemory,
+        [sellMemory],
+        _state,
+        async (result) => {
+          if (result.action === "TOKEN_SOLD") {
+            elizaLogger.log("✅ Stop loss executed successfully");
+          } else if (result.action === "SELL_ERROR") {
+            elizaLogger.error("❌ Stop loss failed");
+          }
+          return [];
+        }
+      );
 
       _callback({
         text: `🚀 Data successfully analyzed`,

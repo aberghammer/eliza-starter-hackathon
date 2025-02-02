@@ -10,14 +10,11 @@ import {
   type Action,
 } from "@elizaos/core";
 
-import {
-  TokenMetrics,
-  TokenMetricsProvider,
-} from "../providers/token-metrics-provider.ts";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider";
+import { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -39,22 +36,20 @@ export const analyzeData: Action = {
       elizaLogger.log("📡 Analyzer started...");
 
       //-------------------------------Stellschrauben--------------------------------
-      const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
-      const cleanDatabase = false; //Cleans all entries into the database, to delete old mistakes or trades that are in the way
+      const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; // ⚠️⚠️⚠️ Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      const hardcodedChain = 42161; // ⚠️⚠️⚠️ Hardcoded arbitrum chain to use for the analysis
+      const cleanDatabase = false; // ⚠️⚠️⚠️ Cleans all entries into the database, to delete old mistakes or trades that are in the way
       //-------------------------------Stellschrauben--------------------------------
-
 
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
       const cookieProvider = new CookieApiProvider(_runtime);
       const dexscreenerProvider = new DexscreenerProvider();
 
-      if(cleanDatabase){
-        tokenMetricsProvider.cleanupAllTokenMetrics(); // Clean existing data, so we can keep trading the same token multiple times
+      if (cleanDatabase) {
+        tokenMetricsProvider.cleanupAllTokenMetrics(); // ⚠️⚠️⚠️ Clean existing data, so we can keep trading the same token multiple times
         elizaLogger.log("Database cleaned, starting fresh analysis...");
       }
-
-
 
       const response = await cookieProvider.fetchAgentByTwitter("aixbt_agent");
 
@@ -74,9 +69,10 @@ export const analyzeData: Action = {
           : "UNKNOWN";
 
       // Daten für die Datenbank formatieren
-      tokenAddress = hardcodedTokenToBuy || tokenAddress; //Takes hardcodedTokenToBuy if its filled, otherwise just uses the tokenaddress given by the agent
+      tokenAddress = hardcodedTokenToBuy || tokenAddress; // ⚠️⚠️⚠️ Takes hardcodedTokenToBuy if its filled, otherwise just uses the tokenaddress given by the agent
       const tokenMetrics: TokenMetrics = {
         tokenAddress,
+        chainId: hardcodedChain || agent.conracts.chain, // ⚠️⚠️⚠️ Takes hardcodedChain if its filled, otherwise just uses the chain given by the agent
         symbol: agent.agentName.toUpperCase(), // Symbol aus AgentName ableiten
         mindshare: agent.mindshare || 0,
         sentimentScore: agent.mindshareDeltaPercent || 0, // Hier könnte eine bessere Sentiment-Berechnung erfolgen
@@ -84,23 +80,23 @@ export const analyzeData: Action = {
         priceChange24h: agent.priceDeltaPercent || 0,
         holderDistribution: `Holders: ${agent.holdersCount} (Change: ${agent.holdersCountDeltaPercent}%)`,
         timestamp: new Date().toISOString(),
-        buySignal: true,  // agent.mindshareDeltaPercent > 10 // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
+        buySignal: true, // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
+        finalized: false,
       };
 
       let buyPrice = 0;
 
       const existingTrade = tokenMetricsProvider
         .getActiveTrades()
-        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress);//+1 Luigi sloppy: Hack to avoid if loop for testing
+        .find((t) => t.tokenAddress === tokenMetrics.tokenAddress); //+1 Luigi sloppy: Hack to avoid if loop for testing
 
       if (!existingTrade) {
-        //tokenMetricsProvider.insertTokenMetrics(tokenMetrics); //Luigi sloppy: disable database writing to allow to buy token multiple times for now
+        tokenMetricsProvider.upsertTokenMetrics(tokenMetrics); //Luigi sloppy: disable database writing to allow to buy token multiple times for now
         elizaLogger.log(
           `✅ Neuer Trade für ${tokenMetrics.tokenAddress} angelegt.`
         );
 
         if (tokenMetrics.buySignal) {
-
           const currentStats = await dexscreenerProvider.fetchTokenPrice(
             tokenAddress
           );
@@ -115,13 +111,8 @@ export const analyzeData: Action = {
             content: {
               text: `Buying token ${tokenMetrics.tokenAddress}`,
               action: "BUY_TOKEN",
-              tokenAddress: tokenMetrics.tokenAddress, 
-              amountInEth: "0.00001", //TODO LUIGI sloppy: Hardcoded amount of buy
-              source: "direct"
             },
           };
-
-          
 
           // Execute the buy action
           await _runtime.processActions(
@@ -130,17 +121,15 @@ export const analyzeData: Action = {
             _state,
             async (result) => {
               if (result.action === "TOKEN_BOUGHT" && result.data) {
-                const tradeData = result.data as { symbol: string; price: number };
+                const tradeData = result.data as {
+                  symbol: string;
+                  price: number;
+                };
                 elizaLogger.log("✅ Buy action completed successfully");
-                
-                // Update metrics with actual trade data from result
-                tokenMetrics.symbol = tradeData.symbol;
-                tokenMetrics.entryPrice = tradeData.price;
-                
-                // Use upsert instead of insert to handle duplicates
-                tokenMetricsProvider.upsertTokenMetrics(tokenMetrics);
-                
-                elizaLogger.log(`✅ Trade metrics saved for ${tokenMetrics.symbol} at price ${tokenMetrics.entryPrice}`);
+
+                elizaLogger.log(
+                  `✅ Trade metrics saved for ${tokenMetrics.symbol} at price ${tokenMetrics.entryPrice}`
+                );
               } else if (result.action === "BUY_ERROR") {
                 elizaLogger.error("❌ Buy action failed");
               }
