@@ -11,7 +11,7 @@ import {
 export const housekeeping: Action = {
   name: "HOUSEKEEPING",
   similes: ["HOUSEKEEPING", "CLEANING", "MAINTENANCE"],
-  description: "Selling at particular price point.",
+  description: "Periodic maintenance tasks.",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
@@ -25,46 +25,61 @@ export const housekeeping: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
+
+      
+      //-------------------------------Stellschrauben--------------------------------
+      const loopAfterXMinutes = 60; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      //-------------------------------Stellschrauben--------------------------------
+
+
       const runHousekeeping = async () => {
         elizaLogger.log("📡 Running housekeeping tasks...");
 
-        // Actions to run periodically
-        const actionsToRun = ["ANALYZE_DATA", "CHECK_SELL"]; 
-        const actionMemories: Memory[] = actionsToRun.map((actionName) => ({
-          id: `${_message.id}-${actionName}` as UUID,
+        // Define which actions to run periodically
+        const actionsToRun = ["ANALYZE_DATA", "CHECK_SELL"];
+
+        // Create memory objects for each action
+        const actionMemories: Memory[] = actionsToRun.map(actionName => ({
+          id: `${_message.id}-${actionName.toLowerCase()}` as UUID,
           agentId: _runtime.agentId,
           userId: _message.userId,
           roomId: _message.roomId,
           createdAt: Date.now(),
           content: {
-            text: `Executing ${actionName}`,
+            text: `Running periodic ${actionName}`,
             action: actionName,
+            source: "housekeeping"
           },
         }));
 
-        await _runtime.processActions(
-          _message,
-          actionMemories,
-          _state,
-          _callback
-        );
+        // Execute all actions
+        for (const memory of actionMemories) {
+          await _runtime.processActions(
+            memory,
+            [memory],
+            _state,
+            async (result) => {
+              if (result.action?.includes("ERROR")) {
+                elizaLogger.error(`❌ Housekeeping ${memory.content.action} failed`);
+              }
+              return [];  // Return empty array to satisfy Promise<Memory[]>
+            }
+          );
+        }
+
+        elizaLogger.log("✅ Housekeeping tasks completed successfully");
       };
 
       // Initial run
       await runHousekeeping();
 
-      // Set up interval (e.g., every 5 minutes)
-      const INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+      // Run every 5 minutes
+      const INTERVAL = loopAfterXMinutes * 60 * 1000; // 5 minutes in milliseconds
       setInterval(runHousekeeping, INTERVAL);
 
       return true;
     } catch (error) {
-      console.error("❌ Error analyzing:", error);
-      _callback({
-        text: "There was an error: .",
-        action: "DATA_ERROR",
-      });
-
+      elizaLogger.error("❌ Error in housekeeping:", error);
       return false;
     }
   },
