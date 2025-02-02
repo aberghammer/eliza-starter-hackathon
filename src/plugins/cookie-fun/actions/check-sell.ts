@@ -82,8 +82,8 @@ export const checkSell: Action = {
 
         // Before the sell checks, calculate the message once
         const profitLossText = profitLossPercent >= 0 
-          ? `+$profitLossPercent% Gewinn`
-          : `$profitLossPercent% Verlust`;
+          ? `+${profitLossPercent}% Gewinn`
+          : `${profitLossPercent}% Verlust`;
 
         // Just show current status
         elizaLogger.log(`📈 ${trade.symbol} hat aktuell ${profitLossText}`);
