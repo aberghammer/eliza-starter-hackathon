@@ -11,6 +11,8 @@ import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
+import { Chain } from '../types/Chain';
+import { ACTIVE_CHAIN } from '../config';
 
 export const sellToken: Action = {
   name: "SELL_TOKEN",
@@ -61,14 +63,15 @@ export const sellToken: Action = {
 
       elizaLogger.log(`🔄 Using token address: ${tokenAddress}`);
 
-      // Get token balance
-      const rpcUrl = _runtime.getSetting("ARBITRUM_RPC_URL");
-      const privateKey = _runtime.getSetting("ARBITRUM_WALLET_PRIVATE_KEY");
-      const routerAddress = _runtime.getSetting("ARBITRUM_UNISWAP_ROUTER");
-      const wethAddress = _runtime.getSetting("ARBITRUM_WETH");
+      // Get selected Chain configuration
+      const selectedChain = (_message.content as any).chain || ACTIVE_CHAIN;
+      const rpcUrl = _runtime.getSetting(`${selectedChain.toUpperCase()}_RPC_URL`);
+      const privateKey = _runtime.getSetting(`${selectedChain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+      const routerAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_UNISWAP_ROUTER`);
+      const wethAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_WETH`);
 
       if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
-        throw new Error("Missing required Arbitrum configuration!");
+        throw new Error(`Missing required ${selectedChain} configuration!`);
       }
 
       const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -86,10 +89,8 @@ export const sellToken: Action = {
       elizaLogger.log(`🔄 Starting token sale for ${tokenAddress} with balance ${balance}`);
 
       const tradeExecutor = new TradeExecutionProvider(
-        rpcUrl,
-        privateKey,
-        routerAddress,
-        wethAddress
+        selectedChain,
+        _runtime
       );
 
       // Execute the sell with full balance
@@ -123,8 +124,14 @@ export const sellToken: Action = {
       // Update database with trade info
       tokenMetricsProvider.updateExitPrice(tokenAddress, exitPrice, profitLossPercent);
 
+      const explorerUrls = {
+        [Chain.ARBITRUM]: 'https://arbiscan.io/tx/',
+        [Chain.MODE]: 'https://explorer.mode.network/tx/',
+        [Chain.AVALANCHE]: 'https://snowtrace.io/tx/'
+      };
+
       _callback({
-        text: `Successfully sold ${tradeResult.symbol} for ${ethers.formatEther(balance)} tokens at price ${exitPrice} (${profitLossPercent > 0 ? '+' : ''}${profitLossPercent}%)\nTransaction: https://arbiscan.io/tx/${tradeResult.tradeId}`.replace(/\n/g, ' '),
+        text: `Successfully sold ${tradeResult.symbol} for ${ethers.formatEther(balance)} tokens at price ${exitPrice} (${profitLossPercent > 0 ? '+' : ''}${profitLossPercent}%)\nTransaction: ${explorerUrls[selectedChain]}${tradeResult.tradeId}`.replace(/\n/g, ' '),
         action: "TOKEN_SOLD",
         data: {
           ...tradeResult,

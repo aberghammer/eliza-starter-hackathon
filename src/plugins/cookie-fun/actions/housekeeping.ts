@@ -7,6 +7,7 @@ import {
   State,
   type Action,
 } from "@elizaos/core";
+import { Chain } from '../types/Chain';
 
 export const housekeeping: Action = {
   name: "HOUSEKEEPING",
@@ -28,7 +29,8 @@ export const housekeeping: Action = {
 
       
       //-------------------------------Stellschrauben--------------------------------
-      const loopAfterXMinutes = 60; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
+      const loopAfterXMinutes = 60; // How often to run housekeeping tasks
+      const activeChain = Chain.ARBITRUM; // Which blockchain to use (ARBITRUM or MODE)
       //-------------------------------Stellschrauben--------------------------------
 
 
@@ -48,7 +50,8 @@ export const housekeeping: Action = {
           content: {
             text: `Running periodic ${actionName}`,
             action: actionName,
-            source: "housekeeping"
+            source: "housekeeping",
+            chain: activeChain
           },
         }));
 

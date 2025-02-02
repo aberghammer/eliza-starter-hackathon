@@ -11,6 +11,7 @@ import BetterSQLite3 from "better-sqlite3";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 import { UUID } from "crypto";
+import { PROFIT_TARGET, STOP_LOSS } from "../config";
 
 export const checkSell: Action = {
   name: "CHECK_SELL",
@@ -88,13 +89,10 @@ export const checkSell: Action = {
         // Just show current status
         elizaLogger.log(`📈 ${trade.symbol} hat aktuell ${profitLossText}`);
 
-        if (alwaysSell || profitLossPercent >= 30) { 
-          elizaLogger.log(`✅ Selling ${trade.symbol} with +${profitLossPercent.toFixed(2)}% profit!`);
-          elizaLogger.log(
-            `${profitLossPercent >= 0 ? '✅' : '⛔'} Selling ${trade.symbol} with ${profitLossText}!`
-          );
+        // Check if we should sell based on configured targets
+        if (profitLossPercent >= PROFIT_TARGET || profitLossPercent <= STOP_LOSS) {
+          elizaLogger.log(`${profitLossPercent >= 0 ? '✅' : '⛔'} Selling ${trade.tokenAddress} at ${profitLossPercent}% ${profitLossPercent >= PROFIT_TARGET ? 'profit' : 'loss'}`);
 
-          // Create sell memory
           const sellMemory: Memory = {
             id: `${_message.id}-sell` as UUID,
             agentId: _runtime.agentId,
@@ -102,14 +100,13 @@ export const checkSell: Action = {
             roomId: _message.roomId,
             createdAt: Date.now(),
             content: {
-              text: `Selling token ${trade.tokenAddress} at +${profitLossPercent}% profit`,
+              text: `Selling token ${trade.tokenAddress} at ${profitLossPercent}% ${profitLossPercent >= PROFIT_TARGET ? 'profit' : 'stop loss'}`,
               action: "SELL_TOKEN",
               tokenAddress: trade.tokenAddress,
               source: "direct"
             },
           };
 
-          // Execute the sell
           await _runtime.processActions(
             sellMemory,
             [sellMemory],
@@ -119,38 +116,6 @@ export const checkSell: Action = {
                 elizaLogger.log(`✅ ${profitLossPercent >= 0 ? 'Profit' : 'Loss'} take completed successfully (${profitLossPercent}%)`);
               } else if (result.action === "SELL_ERROR") {
                 elizaLogger.error("❌ Sale failed");
-              }
-              return [];
-            }
-          );
-        } else if (alwaysSell || profitLossPercent <= -20) { 
-          elizaLogger.log(`⛔ Selling ${trade.symbol} with ${profitLossPercent.toFixed(2)}% loss!`);
-
-          // Create sell memory for stop loss
-          const sellMemory: Memory = {
-            id: `${_message.id}-sell` as UUID,
-            agentId: _runtime.agentId,
-            userId: _message.userId,
-            roomId: _message.roomId,
-            createdAt: Date.now(),
-            content: {
-              text: `Selling token ${trade.tokenAddress} at ${profitLossPercent}% loss (stop loss)`,
-              action: "SELL_TOKEN",
-              tokenAddress: trade.tokenAddress,
-              source: "direct"
-            },
-          };
-
-          // Execute the stop loss
-          await _runtime.processActions(
-            sellMemory,
-            [sellMemory],
-            _state,
-            async (result) => {
-              if (result.action === "TOKEN_SOLD") {
-                elizaLogger.log("✅ Stop loss executed successfully");
-              } else if (result.action === "SELL_ERROR") {
-                elizaLogger.error("❌ Stop loss failed");
               }
               return [];
             }

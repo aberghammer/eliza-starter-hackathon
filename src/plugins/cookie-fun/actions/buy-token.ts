@@ -11,13 +11,15 @@ import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
+import { Chain } from '../types/Chain';
+import { ACTIVE_CHAIN, TRADE_AMOUNT } from '../config';
 
 
 
 export const buyToken: Action = {
   name: "BUY_TOKEN",
-  similes: ["BUY", "PURCHASE TOKEN", "EXECUTE BUY", "BUY ON ARBITRUM"],
-  description: "Buys a token on Arbitrum using SushiSwap",
+  similes: ["BUY", "PURCHASE TOKEN", "EXECUTE BUY"],
+  description: "Buys a token on Arbitrum (or other chains) using SushiSwap",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true; 
@@ -37,22 +39,24 @@ export const buyToken: Action = {
       // Try to get from content object first
       if (typeof _message.content === 'object' && _message.content !== null) {
         tokenAddress = (_message.content as { tokenAddress?: string }).tokenAddress;
-        amountInEth = (_message.content as { amountInEth?: string }).amountInEth;
+        amountInEth = (_message.content as { amountInEth?: string }).amountInEth || TRADE_AMOUNT;
       }
 
       // If not found, try to parse from text
-      if (!tokenAddress || !amountInEth) {
+      if (!tokenAddress) {
         const text = _message.content.text as string;
-        // Match address (0x...) and ETH amount
+        // Match address (0x...)
         const addressMatch = text.match(/0x[a-fA-F0-9]{40}/);
-        const amountMatch = text.match(/(\d+\.?\d*)\s*eth/i);
-        
         tokenAddress = addressMatch?.[0];
-        amountInEth = amountMatch?.[1];
       }
 
-      if (!tokenAddress || !amountInEth) {
-        throw new Error("Missing required parameters. Please specify token address and ETH amount.");
+      if (!tokenAddress) {
+        throw new Error("Missing token address. Please specify the token to buy.");
+      }
+
+      // Use configured amount if not specified
+      if (!amountInEth) {
+        amountInEth = TRADE_AMOUNT;
       }
       
       // Make sure we're working with a valid number string
@@ -61,22 +65,21 @@ export const buyToken: Action = {
 
       elizaLogger.log(`🔄 Starting token purchase for ${tokenAddress} with ${amountInEth} ETH`);
 
-      // Get Arbitrum configuration
-      const rpcUrl = _runtime.getSetting("ARBITRUM_RPC_URL");
-      const privateKey = _runtime.getSetting("ARBITRUM_WALLET_PRIVATE_KEY");
-      const routerAddress = _runtime.getSetting("ARBITRUM_UNISWAP_ROUTER");
-      const wethAddress = _runtime.getSetting("ARBITRUM_WETH");
+      // Get selected Chain configuration
+      const selectedChain = (_message.content as any).chain || ACTIVE_CHAIN;
+      const rpcUrl = _runtime.getSetting(`${selectedChain.toUpperCase()}_RPC_URL`);
+      const privateKey = _runtime.getSetting(`${selectedChain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+      const routerAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_UNISWAP_ROUTER`);
+      const wethAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_WETH`);
 
       if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
-        throw new Error("Missing required Arbitrum configuration!");
+        throw new Error(`Missing required ${selectedChain} configuration!`);
       }
 
       // Initialize trade executor
       const tradeExecutor = new TradeExecutionProvider(
-        rpcUrl,
-        privateKey,
-        routerAddress,
-        wethAddress
+        selectedChain,
+        _runtime
       );
 
       // Execute the buy
@@ -109,8 +112,16 @@ export const buyToken: Action = {
 
       tokenMetricsProvider.upsertTokenMetrics(metrics);
 
+      // And add explorer URLs for transaction link:
+      const explorerUrls = {
+        [Chain.ARBITRUM]: 'https://arbiscan.io/tx/',
+        [Chain.MODE]: 'https://explorer.mode.network/tx/',
+        [Chain.AVALANCHE]: 'https://snowtrace.io/tx/'
+      };
+
+      // Update callback text to use correct explorer
       _callback({
-        text: `Successfully bought ${tokenAddress} for ${amountInEth} ETH\nTransaction: https://arbiscan.io/tx/${tradeResult.tradeId}`.replace(/\n/g, ' '),
+        text: `Successfully bought ${tokenAddress} for ${amountInEth} ETH\nTransaction: ${explorerUrls[selectedChain]}${tradeResult.tradeId}`.replace(/\n/g, ' '),
         action: "TOKEN_BOUGHT",
         data: tradeResult
       });
@@ -144,7 +155,7 @@ export const buyToken: Action = {
       {
         user: "{{eliza}}",
         content: {
-          text: "Executing token purchase on Arbitrum",
+          text: "Executing token purchase",
           action: "BUY_TOKEN",
         },
       },
@@ -161,7 +172,7 @@ export const buyToken: Action = {
       {
         user: "{{eliza}}",
         content: {
-          text: "Initiating token purchase on Arbitrum",
+          text: "Initiating token purchase",
           action: "BUY_TOKEN",
         },
       },
