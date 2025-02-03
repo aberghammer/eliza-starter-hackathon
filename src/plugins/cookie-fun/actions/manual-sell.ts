@@ -6,8 +6,8 @@ import {
   type State,
   type HandlerCallback 
 } from "@elizaos/core";
-import { TokenTrader } from "../services/token-trader";
-import { ACTIVE_CHAIN } from '../config';
+import { TokenTrader } from "../services/token-trader.ts";
+import { ACTIVE_CHAIN } from '../config.ts';
 
 export const manualSell: Action = {
   name: "MANUAL_SELL",

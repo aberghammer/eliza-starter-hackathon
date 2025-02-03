@@ -28,7 +28,8 @@ import {
   parseArguments,
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
-import { cookieFun } from "./plugins/cookie-fun/index.ts";
+import cookieFun from "./plugins/cookie-fun/index.ts";
+import { HOUSEKEEPING_MINUTES } from "./plugins/cookie-fun/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -115,8 +116,6 @@ async function startAgent(character: Character, directClient: DirectClient) {
 
 // Set up background housekeeping task
 async function setupHousekeeping(runtime: IAgentRuntime) {
-  const INTERVAL = 5 * 60 * 1000;
-  
   const runTasks = async () => {
     try {
       const content: Content = {
@@ -157,15 +156,13 @@ async function setupHousekeeping(runtime: IAgentRuntime) {
         state,
         () => Promise.resolve([])
       );
-
-      elizaLogger.log("✅ Housekeeping tasks completed successfully");
     } catch (error) {
       elizaLogger.error("Background task error:", error);
     }
   };
 
   await runTasks();
-  setInterval(runTasks, INTERVAL);
+  setInterval(runTasks, HOUSEKEEPING_MINUTES * 60 * 1000);
 }
 
 const checkPortAvailable = (port: number): Promise<boolean> => {

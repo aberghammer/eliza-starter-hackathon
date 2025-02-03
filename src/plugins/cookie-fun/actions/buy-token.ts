@@ -6,13 +6,13 @@ import {
   type State,
   type HandlerCallback 
 } from "@elizaos/core";
-import { TokenTrader } from "../services/token-trader";
-import { ACTIVE_CHAIN, TRADE_AMOUNT } from '../config';
+import { TokenTrader } from "../services/token-trader.ts";
+import { ACTIVE_CHAIN, TRADE_AMOUNT } from '../config.ts';
 
 export const buyToken: Action = {
   name: "BUY_TOKEN",
   similes: ["BUY", "PURCHASE TOKEN"],
-  description: "Manually buy a token",
+  description: "Buy a token",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;

@@ -4,159 +4,103 @@ import {
   type IAgentRuntime, 
   type Memory,
   type State,
-  type HandlerCallback 
+  type HandlerCallback,
+  type ActionExample
 } from "@elizaos/core";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider";
-import { DexscreenerProvider } from "../providers/dexscreener-provider";
-import { PROFIT_TARGET, STOP_LOSS } from "../config";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
+import { PROFIT_TARGET, STOP_LOSS } from "../config.ts";
 import BetterSQLite3 from "better-sqlite3";
-
-export class CheckSellAction {
-  private tokenMetricsProvider: TokenMetricsProvider;
-  private dexscreenerProvider: DexscreenerProvider;
-  private db: BetterSQLite3.Database;
-
-  constructor() {
-    this.db = new BetterSQLite3("data/db.sqlite");
-    this.tokenMetricsProvider = new TokenMetricsProvider(this.db);
-    this.dexscreenerProvider = new DexscreenerProvider();
-  }
-
-  async checkForSells() {
-    try {
-      const activeTrades = this.tokenMetricsProvider.getActiveTrades();
-      elizaLogger.log(`📊 Checking ${activeTrades.length} active trades`);
-
-      for (const trade of activeTrades) {
-        try {
-          const currentPriceData = await this.dexscreenerProvider.fetchTokenPrice(
-            trade.tokenAddress
-          );
-
-          // Find the WETH pair
-          const wethPair = currentPriceData.pairs?.find(
-            p => p.quoteToken.symbol === "WETH"
-          );
-
-          if (!wethPair) {
-            elizaLogger.error(`⚠️ No WETH pair found for ${trade.tokenAddress}`);
-            continue;
-          }
-
-          const currentPriceInEth = parseFloat(wethPair.priceNative);
-
-          if (!currentPriceInEth || !trade.entryPrice) {
-            elizaLogger.error(`⚠️ Missing price data for ${trade.tokenAddress}`);
-            continue;
-          }
-
-          const profitLossPercent = Math.round(
-            ((currentPriceInEth - trade.entryPrice) / trade.entryPrice) * 100
-          );
-
-          elizaLogger.log(`📊 ${trade.symbol} current stats:`, {
-            entryPrice: trade.entryPrice,
-            currentPrice: currentPriceInEth,
-            profitLoss: `${profitLossPercent}%`
-          });
-
-          // Check if we should mark for selling
-          if (profitLossPercent >= PROFIT_TARGET || profitLossPercent <= STOP_LOSS) {
-            elizaLogger.log(`🎯 Marking ${trade.symbol} for selling at ${profitLossPercent}% ${profitLossPercent >= PROFIT_TARGET ? 'profit' : 'loss'}`);
-            
-            this.tokenMetricsProvider.markForSelling(trade.tokenAddress, trade.chainId);
-          }
-
-        } catch (error) {
-          elizaLogger.error(`❌ Error checking ${trade.symbol}:`, error);
-        }
-      }
-
-      return true;
-    } catch (error) {
-      elizaLogger.error("❌ Error in check-sell execution:", error);
-      return false;
-    }
-  }
-}
 
 export const checkSell: Action = {
   name: "CHECK_SELL",
   similes: ["CHECK", "CHECK SELL", "CHECK PROFITS", "CHECK TRADES"],
-  description: "Check if any tokens should be sold based on profit/loss targets",
-
-  validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return true;
-  },
+  description: "Checks if any active trades should be sold",
 
   handler: async (
-    _runtime: IAgentRuntime,
+    runtime: IAgentRuntime,
     _message: Memory,
     _state: State,
     _options: { [key: string]: unknown },
-    _callback: HandlerCallback
+    callback?: HandlerCallback
   ): Promise<boolean> => {
     try {
+      //-------------------------------Stellschrauben--------------------------------
+      const alwaysFlagsForSell = true; // Flags all active trades for sell
+      const printDexScreenerResponse = false; // Prints the DexScreener response (duh)
+      //-------------------------------Stellschrauben--------------------------------
+      
       const db = new BetterSQLite3("data/db.sqlite");
       const tokenMetricsProvider = new TokenMetricsProvider(db);
       const dexscreenerProvider = new DexscreenerProvider();
 
       const activeTrades = tokenMetricsProvider.getActiveTrades();
-      elizaLogger.log(`📊 Checking ${activeTrades.length} active trades`);
+      elizaLogger.log(`📊 Checking ${activeTrades.length} active trades for sellconditions`);
 
+      let markedForSelling = 0;
       for (const trade of activeTrades) {
         try {
-          const currentPriceData = await dexscreenerProvider.fetchTokenPrice(
-            trade.tokenAddress
-          );
-
-          const wethPair = currentPriceData.pairs?.find(
-            p => p.quoteToken.symbol === "WETH"
-          );
-
-          if (!wethPair) {
-            elizaLogger.error(`⚠️ No WETH pair found for ${trade.tokenAddress}`);
-            continue;
+          const dexData = await dexscreenerProvider.fetchTokenPrice(trade.tokenAddress);
+          if(printDexScreenerResponse){
+            elizaLogger.log("DexScreener response:", dexData); 
           }
+     
+          
+          // Find the WETH pair
+          const wethPair = dexData.pairs?.find(p => p.quoteToken.symbol === "WETH");
+          const currentPriceInEth = wethPair?.priceNative ? parseFloat(wethPair.priceNative) : null;
+          const entryPrice = trade.entryPrice;
+          const symbol = wethPair?.baseToken?.symbol || trade.symbol;  // Use trade.symbol as fallback
 
-          const currentPriceInEth = parseFloat(wethPair.priceNative);
-
-          if (!currentPriceInEth || !trade.entryPrice) {
-            elizaLogger.error(`⚠️ Missing price data for ${trade.tokenAddress}`);
-            continue;
-          }
-
-          const profitLossPercent = Math.round(
-            ((currentPriceInEth - trade.entryPrice) / trade.entryPrice) * 100
-          );
-
-          elizaLogger.log(`📊 ${trade.symbol} current stats:`, {
-            entryPrice: trade.entryPrice,
-            currentPrice: currentPriceInEth,
-            profitLoss: `${profitLossPercent}%`
+          elizaLogger.log(`Debug values for ${symbol}:`, {
+            currentPriceInEth,
+            entryPrice,
+            hasCurrentPrice: !!currentPriceInEth,
+            hasEntryPrice: !!entryPrice,
+            pairFound: !!wethPair
           });
 
-          if (profitLossPercent >= PROFIT_TARGET || profitLossPercent <= STOP_LOSS) {
-            elizaLogger.log(`🎯 Marking ${trade.symbol} for selling at ${profitLossPercent}% ${profitLossPercent >= PROFIT_TARGET ? 'profit' : 'loss'}`);
-            tokenMetricsProvider.markForSelling(trade.tokenAddress, trade.chainId);
+          if (!entryPrice || !currentPriceInEth) {
+            elizaLogger.log(`Skipping ${symbol} due to missing price data`);
+            continue;
+          }
+
+          const profitLossPercent = ((currentPriceInEth - entryPrice) / entryPrice) * 100;
+
+          if (profitLossPercent >= PROFIT_TARGET || profitLossPercent <= STOP_LOSS || alwaysFlagsForSell) {
+            elizaLogger.log(`�� Sell signal for ${symbol}: P/L = ${profitLossPercent}%`);
+            markedForSelling++;
+            
+            const updatedMetrics = {
+              ...trade,
+              sellSignal: true,
+              timestamp: new Date().toISOString()
+            };
+            tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           }
         } catch (error) {
-          elizaLogger.error(`❌ Error checking ${trade.symbol}:`, error);
+          elizaLogger.error(`Error checking sell for ${trade.symbol}:`, error);
         }
       }
 
-      _callback({
-        text: `Checked ${activeTrades.length} active trades for sell conditions`,
-        action: "CHECK_COMPLETE",
-      });
+      elizaLogger.log(`✅ Sell check completed. Flagged ${markedForSelling} of ${activeTrades.length} trades for selling`);
+      
+      if (callback) {
+        callback({
+          text: `Checked ${activeTrades.length} trades, marked ${markedForSelling} for selling`,
+          action: "CHECK_COMPLETE"
+        });
+      }
 
       return true;
     } catch (error) {
-      elizaLogger.error("❌ Error in check-sell:", error);
-      _callback({
-        text: `Failed to check trades: ${error.message}`,
-        action: "CHECK_ERROR",
-      });
+      elizaLogger.error("❌ Error in sell check:", error);
+      if (callback) {
+        callback({
+          text: `Failed to check trades: ${error.message}`,
+          action: "CHECK_ERROR"
+        });
+      }
       return false;
     }
   },
@@ -172,10 +116,40 @@ export const checkSell: Action = {
       {
         user: "{{eliza}}",
         content: {
-          text: "Checking sell conditions for active trades",
+          text: "Checking sell conditions for active trades...",
           action: "CHECK_SELL",
         },
       },
     ],
-  ],
+    [
+      {
+        user: "{{user2}}",
+        content: {
+          text: "How are our trades performing?",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "I'll check the profit/loss status of our trades.",
+          action: "CHECK_SELL",
+        },
+      },
+    ],
+    [
+      {
+        user: "{{user3}}",
+        content: {
+          text: "Should we take profits?",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "Analyzing trades for profit-taking opportunities...",
+          action: "CHECK_SELL",
+        },
+      },
+    ]
+  ] as ActionExample[][],
 } as Action;

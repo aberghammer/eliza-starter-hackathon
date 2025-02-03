@@ -1,23 +1,6 @@
 import BetterSQLite3 from "better-sqlite3";
-
-export interface TokenMetrics {
-  tokenAddress: string;
-  symbol: string;
-  mindshare: number;
-  sentimentScore: number;
-  liquidity: number;
-  priceChange24h: number;
-  holderDistribution: string;
-  timestamp: string;
-  buySignal: boolean;
-  sellSignal?: boolean;
-  entryPrice?: number;
-  exitPrice?: number;
-  profitLoss?: number;
-  chainId: number;
-  chainName: string;
-  finalized: boolean;
-}
+import { elizaLogger } from "@elizaos/core";
+import type { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export class TokenMetricsProvider {
   constructor(private db: BetterSQLite3.Database) {
@@ -62,10 +45,6 @@ export class TokenMetricsProvider {
       SELECT * FROM token_metrics 
       WHERE buySignal = TRUE 
       AND finalized = FALSE
-      AND tokenAddress NOT IN (
-        SELECT tokenAddress FROM token_metrics 
-        WHERE finalized = FALSE
-      )
     `).all();
   }
 
@@ -77,7 +56,7 @@ export class TokenMetricsProvider {
     `).all();
   }
 
-  markForSelling(tokenAddress: string, chainId: number) {
+  flagForSelling(tokenAddress: string, chainId: number) {
     this.db.prepare(`
       UPDATE token_metrics 
       SET sellSignal = TRUE 

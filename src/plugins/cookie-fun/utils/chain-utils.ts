@@ -1,4 +1,4 @@
-import { Chain } from '../types/Chain';
+import { Chain } from '../types/Chain.ts';
 
 // Type guard to check if a string is a valid Chain
 export function isValidChain(chain: string): chain is Chain {

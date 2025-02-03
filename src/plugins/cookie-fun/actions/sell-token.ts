@@ -1,24 +1,24 @@
 import { elizaLogger } from "@elizaos/core";
 import {
-  ActionExample,
-  HandlerCallback,
-  IAgentRuntime,
-  Memory,
-  State,
+  type ActionExample,
+  type HandlerCallback,
+  type IAgentRuntime,
+  type Memory,
+  type State,
   type Action,
 } from "@elizaos/core";
 import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
-import { Chain } from '../types/Chain';
-import { ACTIVE_CHAIN } from '../config';
-import { stringToChain } from '../utils/chain-utils';
+import { Chain } from '../types/Chain.ts';
+import { ACTIVE_CHAIN } from '../config.ts';
+import { stringToChain } from '../utils/chain-utils.ts';
 
 export const sellToken: Action = {
   name: "SELL_TOKEN",
   similes: ["SELL", "DISPOSE TOKEN", "EXECUTE SELL", "SELL ON ARBITRUM", "MANUAL SELL", "triggerword"],
-  description: "Sells a token on Arbitrum using SushiSwap",
+  description: "Sells a token on a given Chain using SushiSwap",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;

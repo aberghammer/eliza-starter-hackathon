@@ -1,8 +1,9 @@
 import { elizaLogger } from "@elizaos/core";
 import { ethers } from 'ethers';
-import { TradeLog } from '../types/TradeLog';
-import { Chain } from '../types/Chain';
-import { IAgentRuntime } from '@elizaos/core';
+import type { TradeLog } from '../types/TradeLog.ts';
+import { Chain } from '../types/Chain.ts';
+import type { IAgentRuntime } from '@elizaos/core';
+import { ACTIVE_CHAIN } from "../config.ts";
 
 export class TradeExecutionProvider {
   private readonly provider: ethers.JsonRpcProvider;
@@ -95,7 +96,7 @@ export class TradeExecutionProvider {
         timestamp: new Date().toISOString()
       };
 
-      elizaLogger.log(`✅ Successfully bought ${symbol} on ACTIVE_CHAIN`, tradeLog);
+      elizaLogger.log(`✅ Successfully bought ${symbol} on ${ACTIVE_CHAIN}`, tradeLog);
       return tradeLog;
 
     } catch (error) {
@@ -199,7 +200,7 @@ export class TradeExecutionProvider {
         timestamp: new Date().toISOString()
       };
 
-      elizaLogger.log(`✅ Successfully sold ${symbol} on ACTIVE_CHAIN`, tradeLog);
+      elizaLogger.log(`✅ Successfully sold ${symbol} on ${ACTIVE_CHAIN}`, tradeLog);
       return tradeLog;
 
     } catch (error) {

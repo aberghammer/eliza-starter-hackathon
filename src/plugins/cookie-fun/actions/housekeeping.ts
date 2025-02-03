@@ -6,7 +6,7 @@ import {
   type State,
   type HandlerCallback 
 } from "@elizaos/core";
-import { HousekeepingService } from "../services/housekeeping";
+import { HousekeepingService } from "../services/housekeeping.ts";
 
 export const housekeeping: Action = {
   name: "HOUSEKEEPING",

@@ -1,11 +1,11 @@
 import { elizaLogger, type IAgentRuntime, type HandlerCallback } from "@elizaos/core";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider";
-import { TRADE_AMOUNT, getChainSettings } from "../config";
-import { stringToChain, getChainId, getExplorerUrl } from '../utils/chain-utils';
+import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+import { TRADE_AMOUNT, getChainSettings } from "../config.ts";
+import { stringToChain, getChainId, getExplorerUrl } from '../utils/chain-utils.ts';
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
-import type { BuyParams, SellParams, TradeResult } from "../types/trading";
+import type { BuyParams, SellParams, TradeResult } from "../types/Trading.ts";
 
 export class TokenTrader {
   private tokenMetricsProvider: TokenMetricsProvider;
@@ -36,13 +36,23 @@ export class TokenTrader {
           action: "BUY_ERROR",
         });
       }
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message,
+        symbol: "",
+        price: 0,
+        tradeId: "",
+        profitLossPercent: 0,
+        tokensSpent: 0,
+        ethReceived: 0
+      };
     }
   }
 
   async processPendingBuys(runtime: IAgentRuntime): Promise<boolean> {
     try {
       const tokensToBuy = this.tokenMetricsProvider.getTokensToBuy();
+      elizaLogger.log(`Found ${tokensToBuy.length} tokens with buy signals`);
       
       for (const token of tokensToBuy) {
         try {
@@ -54,22 +64,24 @@ export class TokenTrader {
           });
 
           if (!result.success) {
-            elizaLogger.error(`Failed to buy ${token.symbol}`);
+            elizaLogger.error(`Failed to buy ${result.symbol}`);
             continue;
           }
 
-          // Update token metrics
-          token.entryPrice = result.price;
-          token.buySignal = false;
-          token.timestamp = new Date().toISOString();
-          this.tokenMetricsProvider.upsertTokenMetrics(token);
+          // Update only what changed after buying
+          const updatedMetrics = {
+            ...token,
+            buySignal: false,        // Reset buy flag
+            entryPrice: result.price, // Set entry price
+            timestamp: new Date().toISOString()
+          };
 
-          elizaLogger.log(`✅ Bought ${token.symbol} at ${result.price}`);
+          this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
+          elizaLogger.log(`✅ Bought ${result.symbol} at ${result.price}`);
         } catch (error) {
           elizaLogger.error(`❌ Error buying ${token.symbol}:`, error);
         }
       }
-
       return true;
     } catch (error) {
       elizaLogger.error("❌ Error processing pending buys:", error);
@@ -109,39 +121,26 @@ export class TokenTrader {
     );
 
     const amountInWei = ethers.parseEther(amount).toString();
-    const tradeResult = await tradeExecutor.buyToken(
-      tokenAddress,
-      amountInWei
+    
+    elizaLogger.log(
+      `🚀 Sending buy transaction: Token: ${tokenAddress} || Chain: ${chainName} || Amount: ${amount} ETH (${amountInWei} wei) || Router: ${settings.routerAddress}`
     );
 
+    const tradeResult = await tradeExecutor.buyToken(tokenAddress, amountInWei);
     if (!tradeResult) {
       throw new Error("Trade execution failed");
     }
 
-    // Save to database
-    const metrics = {
-      tokenAddress,
-      chainId: getChainId(chainName),
-      chainName,
-      symbol: tradeResult.symbol,
-      mindshare: 0,
-      sentimentScore: 0,
-      liquidity: 0,
-      priceChange24h: 0,
-      holderDistribution: "",
-      timestamp: new Date().toISOString(),
-      buySignal: false,
-      entryPrice: tradeResult.price,
-      finalized: false
-    };
-
-    this.tokenMetricsProvider.upsertTokenMetrics(metrics);
+    elizaLogger.log(`✅ Buy transaction successful. TxHash: ${tradeResult.tradeId}`);
 
     return {
       success: true,
       symbol: tradeResult.symbol,
       price: tradeResult.price,
-      tradeId: tradeResult.tradeId
+      tradeId: tradeResult.tradeId,
+      profitLossPercent: 0,  // Not applicable for buys
+      tokensSpent: 0,        // Not applicable for buys
+      ethReceived: 0         // Not applicable for buys
     };
   }
 
@@ -167,7 +166,16 @@ export class TokenTrader {
           action: "SELL_ERROR",
         });
       }
-      return { success: false, error: error.message };
+      return { 
+        success: false, 
+        error: error.message,
+        symbol: "",
+        price: 0,
+        tradeId: "",
+        profitLossPercent: 0,
+        tokensSpent: 0,
+        ethReceived: 0
+      };
     }
   }
 
@@ -188,15 +196,22 @@ export class TokenTrader {
             continue;
           }
 
-          elizaLogger.log(`✅ Sold ${token.symbol} at ${result.profitLossPercent}% ${result.profitLossPercent >= 0 ? 'profit' : 'loss'}`);
+          const profitOrLoss = result.profitLossPercent >= 0 ? 'profit' : 'loss';
+          const ethDiff = result.ethReceived - parseFloat(TRADE_AMOUNT);
+          const ethDiffFormatted = ethDiff.toFixed(6);
+          const ethResult = ethDiff >= 0 ? `gained ${ethDiffFormatted}` : `lost ${Math.abs(ethDiff).toFixed(6)}`;
+
+          elizaLogger.log(
+            `✅ Sold ${result.symbol} with ${profitOrLoss} | Entry: ${token.entryPrice} ETH | Exit: ${result.price} ETH | Amount: ${result.tokensSpent} tokens | P/L: ${result.profitLossPercent}% | ETH ${ethResult} ETH`
+          );
         } catch (error) {
-          elizaLogger.error(`❌ Error selling ${token.symbol}:`, error);
+          elizaLogger.error(`❌ Error selling ${token.symbol}:`, error.message || error);
         }
       }
 
       return true;
     } catch (error) {
-      elizaLogger.error("❌ Error processing pending sells:", error);
+      elizaLogger.error("❌ Error processing pending sells:", error.message || error);
       return false;
     }
   }
@@ -204,59 +219,86 @@ export class TokenTrader {
   private async executeSell(params: SellParams): Promise<TradeResult> {
     const { tokenAddress, chainName, runtime } = params;
 
-    const settings = getChainSettings(runtime, chainName);
-    if (!settings.rpcUrl || !settings.privateKey) {
-      throw new Error(`Missing required ${chainName} configuration!`);
+    try {
+      const settings = getChainSettings(runtime, chainName);
+      if (!settings.rpcUrl || !settings.privateKey) {
+        throw new Error(`Missing required ${chainName} configuration!`);
+      }
+
+      // Get token info from database
+      const trade = this.tokenMetricsProvider.getActiveTrades()
+        .find(t => t.tokenAddress.toLowerCase() === tokenAddress.toLowerCase());
+
+      if (!trade) {
+        throw new Error("No active trade found for this token");
+      }
+
+      const tradeExecutor = new TradeExecutionProvider(
+        stringToChain(chainName),
+        runtime
+      );
+
+      // Get token balance with retry
+      let balance;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          balance = await this.getTokenBalance(tokenAddress, chainName, runtime);
+          break;
+        } catch (error) {
+          retries--;
+          if (retries === 0) throw error;
+          await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s between retries
+        }
+      }
+
+      if (!balance || balance === BigInt(0)) {
+        throw new Error("No token balance to sell");
+      }
+
+      const tradeResult = await tradeExecutor.sellToken(
+        tokenAddress,
+        balance.toString()
+      );
+
+      if (!tradeResult) {
+        throw new Error("Trade execution failed");
+      }
+
+      // Calculate profit/loss
+      const profitLossPercent = Math.round(
+        ((tradeResult.price - trade.entryPrice!) / trade.entryPrice!) * 100
+      );
+
+      // Finalize the trade in database
+      this.tokenMetricsProvider.finalizeTrade(
+        tokenAddress,
+        trade.chainId,
+        tradeResult.price,
+        profitLossPercent
+      );
+
+      return {
+        success: true,
+        symbol: tradeResult.symbol,
+        price: tradeResult.price,
+        tradeId: tradeResult.tradeId,
+        profitLossPercent,
+        tokensSpent: parseFloat(ethers.formatEther(balance)),
+        ethReceived: tradeResult.price * parseFloat(ethers.formatEther(balance))
+      };
+    } catch (error) {
+      elizaLogger.error("❌ Error executing sell:", error);
+      return {
+        success: false,
+        error: error.message,
+        symbol: "",
+        price: 0,
+        tradeId: "",
+        profitLossPercent: 0,
+        tokensSpent: 0,
+        ethReceived: 0
+      };
     }
-
-    // Get token info from database
-    const trade = this.tokenMetricsProvider.getActiveTrades()
-      .find(t => t.tokenAddress.toLowerCase() === tokenAddress.toLowerCase());
-
-    if (!trade) {
-      throw new Error("No active trade found for this token");
-    }
-
-    const tradeExecutor = new TradeExecutionProvider(
-      stringToChain(chainName),
-      runtime
-    );
-
-    // Get token balance
-    const balance = await this.getTokenBalance(tokenAddress, chainName, runtime);
-
-    if (balance === BigInt(0)) {
-      throw new Error("No token balance to sell");
-    }
-
-    const tradeResult = await tradeExecutor.sellToken(
-      tokenAddress,
-      balance.toString()
-    );
-
-    if (!tradeResult) {
-      throw new Error("Trade execution failed");
-    }
-
-    // Calculate profit/loss
-    const profitLossPercent = Math.round(
-      ((tradeResult.price - trade.entryPrice!) / trade.entryPrice!) * 100
-    );
-
-    // Finalize the trade in database
-    this.tokenMetricsProvider.finalizeTrade(
-      tokenAddress,
-      trade.chainId,
-      tradeResult.price,
-      profitLossPercent
-    );
-
-    return {
-      success: true,
-      symbol: tradeResult.symbol,
-      price: tradeResult.price,
-      tradeId: tradeResult.tradeId,
-      profitLossPercent
-    };
   }
 } 

@@ -7,10 +7,10 @@ import {
   type State,
   type HandlerCallback 
 } from "@elizaos/core";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider";
-import { TRADE_AMOUNT } from "../config";
-import {  getChainId } from '../utils/chain-utils';
+import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+import { TRADE_AMOUNT } from "../config.ts";
+import { getChainId } from '../utils/chain-utils.ts';
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
 

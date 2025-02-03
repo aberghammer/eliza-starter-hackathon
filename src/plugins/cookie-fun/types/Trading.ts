@@ -1,4 +1,5 @@
-import type { Chain } from './Chain';
+import type { IAgentRuntime, HandlerCallback } from "@elizaos/core";
+import type { Chain } from './Chain.ts';
 
 export interface BuyParams {
   tokenAddress: string;
@@ -6,7 +7,7 @@ export interface BuyParams {
   amount?: string;
   runtime: IAgentRuntime;
   callback?: HandlerCallback;
-}
+} 
 
 export interface SellParams {
   tokenAddress: string;
@@ -17,11 +18,13 @@ export interface SellParams {
 
 export interface TradeResult {
   success: boolean;
-  symbol?: string;
-  price?: number;
-  tradeId?: string;
+  symbol: string;
+  price: number;
+  tradeId: string;
+  profitLossPercent: number;
+  tokensSpent: number;
+  ethReceived: number;
   error?: string;
-  profitLossPercent?: number;
 }
 
 export interface ChainSettings {
