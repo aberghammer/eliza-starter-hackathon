@@ -1,5 +1,4 @@
 import { PostgresDatabaseAdapter } from "@elizaos/adapter-postgres";
-import { elizaLogger } from "@elizaos/core";
 import type { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export class TokenMetricsProvider {
@@ -53,14 +52,14 @@ export class TokenMetricsProvider {
     const result = await this.db.query(
       `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE`
     );
-    return result.rows;
+    return result.rows; // ✅ Nur die Daten zurückgeben
   }
 
   async getActiveTrades(): Promise<TokenMetrics[]> {
     const result = await this.db.query(
       `SELECT * FROM token_metrics WHERE entry_price IS NOT NULL AND finalized = FALSE`
     );
-    return result.rows;
+    return result.rows; // ✅ Nur die Daten zurückgeben
   }
 
   async getLatestTokenMetrics(count = 5): Promise<TokenMetrics[]> {
@@ -68,7 +67,7 @@ export class TokenMetricsProvider {
       `SELECT * FROM token_metrics ORDER BY timestamp DESC LIMIT $1`,
       [count]
     );
-    return result.rows;
+    return result.rows; // ✅ Nur die Daten zurückgeben
   }
 
   async flagForSelling(token_address: string, chain_id: number) {
@@ -97,7 +96,7 @@ export class TokenMetricsProvider {
         liquidity, price_change24h, holder_distribution, timestamp, 
         buy_signal, sell_signal, entry_price, exit_price, profit_loss, finalized
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      ON CONFLICT(token_address, chain_id, timestamp) DO UPDATE SET
+      ON CONFLICT (token_address, chain_id, timestamp) DO UPDATE SET
         chain_name = EXCLUDED.chain_name,
         symbol = EXCLUDED.symbol,
         mindshare = EXCLUDED.mindshare,
@@ -134,12 +133,10 @@ export class TokenMetricsProvider {
         metrics.finalized,
       ]);
 
-      elizaLogger.info(
-        `✅ TokenMetrics für ${metrics.token_address} gespeichert.`
-      );
+      console.log(`✅ TokenMetrics für ${metrics.token_address} gespeichert.`);
       return true;
     } catch (error) {
-      elizaLogger.error("❌ Fehler beim Speichern der Token-Metriken:", error);
+      console.error("❌ Fehler beim Speichern der Token-Metriken:", error);
       return false;
     }
   }
@@ -161,10 +158,10 @@ export class TokenMetricsProvider {
         `DELETE FROM token_metrics WHERE token_address = $1`,
         [token_address]
       );
-      elizaLogger.info(`🗑 Token-Metriken für ${token_address} gelöscht.`);
+      console.log(`🗑 Token-Metriken für ${token_address} gelöscht.`);
       return true;
     } catch (error) {
-      elizaLogger.error("❌ Fehler beim Löschen der Token-Metriken:", error);
+      console.error("❌ Fehler beim Löschen der Token-Metriken:", error);
       return false;
     }
   }
@@ -172,9 +169,9 @@ export class TokenMetricsProvider {
   async cleanupAllTokenMetrics(): Promise<void> {
     try {
       await this.db.query(`DELETE FROM token_metrics`);
-      elizaLogger.info("🧹 Alle Token-Metriken wurden gelöscht.");
+      console.log("🧹 Alle Token-Metriken wurden gelöscht.");
     } catch (error) {
-      elizaLogger.error("❌ Fehler beim Bereinigen der Token-Metriken:", error);
+      console.error("❌ Fehler beim Bereinigen der Token-Metriken:", error);
     }
   }
 

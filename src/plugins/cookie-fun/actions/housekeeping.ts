@@ -1,10 +1,10 @@
-import { 
-  elizaLogger, 
-  type Action, 
-  type IAgentRuntime, 
+import {
+  elizaLogger,
+  type Action,
+  type IAgentRuntime,
   type Memory,
   type State,
-  type HandlerCallback 
+  type HandlerCallback,
 } from "@elizaos/core";
 import { HousekeepingService } from "../services/housekeeping.ts";
 import { HOUSEKEEPING_MINUTES } from "../config.ts";
@@ -13,12 +13,13 @@ export const housekeeping: Action = {
   name: "HOUSEKEEPING",
   similes: [
     "HOUSEKEEPING",
-  //  "MAINTENANCE",
-  //  "RUN TASKS",
-  //  "START HOUSEKEEPING",
-  //  "AUTOMATIC"
+    //  "MAINTENANCE",
+    //  "RUN TASKS",
+    //  "START HOUSEKEEPING",
+    //  "AUTOMATIC"
   ],
-  description: "Run automated trading tasks. Use 'loop' parameter to run continuously",
+  description:
+    "Run automated trading tasks. Use 'loop' parameter to run continuously",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
@@ -32,10 +33,9 @@ export const housekeeping: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
+      const service = new HousekeepingService(_runtime);
 
-      const service = new HousekeepingService();
-      
-     /* // Initial callback with mode info
+      /* // Initial callback with mode info
       _callback?.({
         text: "🔄 Starting housekeeping tasks...",
         action: "HOUSEKEEPING_START",
@@ -46,9 +46,11 @@ export const housekeeping: Action = {
       });*/
 
       const result = await service.runCycle(_runtime, _callback);
-      
+
       // Check if loop parameter was passed
-      const shouldLoop = (_message.content as any).text?.toLowerCase().includes('loop');
+      const shouldLoop = (_message.content as any).text
+        ?.toLowerCase()
+        .includes("loop");
 
       if (result && shouldLoop && !global.housekeepingInterval) {
         global.housekeepingInterval = setInterval(
@@ -58,22 +60,28 @@ export const housekeeping: Action = {
 
         // Scheduling message only for loop mode
         _callback?.({
-          text: `✅ Housekeeping scheduled | Interval: ${HOUSEKEEPING_MINUTES}min | Next run: ${new Date(Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000).toLocaleTimeString()}`,
+          text: `✅ Housekeeping scheduled | Interval: ${HOUSEKEEPING_MINUTES}min | Next run: ${new Date(
+            Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000
+          ).toLocaleTimeString()}`,
           action: "HOUSEKEEPING_SCHEDULED",
           data: {
             intervalMinutes: HOUSEKEEPING_MINUTES,
-            nextRun: new Date(Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000).toISOString()
-          }
+            nextRun: new Date(
+              Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000
+            ).toISOString(),
+          },
         });
       } else if (result) {
         // Single run completion message
         _callback?.({
-          text: `✅ Housekeeping cycle complete | Tasks executed: Market analysis, Buy orders, Sell checks | Duration: ${Date.now() - new Date(_message.createdAt).getTime()}ms`,
+          text: `✅ Housekeeping cycle complete | Tasks executed: Market analysis, Buy orders, Sell checks | Duration: ${
+            Date.now() - new Date(_message.createdAt).getTime()
+          }ms`,
           action: "HOUSEKEEPING_COMPLETE",
           data: {
             duration: Date.now() - new Date(_message.createdAt).getTime(),
-            mode: 'single'
-          }
+            mode: "single",
+          },
         });
       }
 
@@ -85,8 +93,8 @@ export const housekeeping: Action = {
         action: "HOUSEKEEPING_ERROR",
         data: {
           error: error.message,
-          timestamp: new Date().toISOString()
-        }
+          timestamp: new Date().toISOString(),
+        },
       });
       elizaLogger.error("Error in housekeeping:", error);
       return false;

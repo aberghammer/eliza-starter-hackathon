@@ -1,13 +1,13 @@
-import { 
-  elizaLogger, 
-  type Action, 
-  type IAgentRuntime, 
+import {
+  elizaLogger,
+  type Action,
+  type IAgentRuntime,
   type Memory,
   type State,
-  type HandlerCallback 
+  type HandlerCallback,
 } from "@elizaos/core";
 import { TokenTrader } from "../services/token-trader.ts";
-import { ACTIVE_CHAIN } from '../config.ts';
+import { ACTIVE_CHAIN } from "../config.ts";
 
 export const manualSell: Action = {
   name: "MANUAL_SELL",
@@ -28,22 +28,26 @@ export const manualSell: Action = {
     try {
       // Extract parameters from message
       const content = _message.content as any;
-      const tokenAddress = content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
+      const tokenAddress =
+        content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
       const chainName = content.chain || ACTIVE_CHAIN;
-      const amount = content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount;  // Optional amount for partial sells
+      const amount =
+        content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount; // Optional amount for partial sells
 
       if (!tokenAddress) {
-        throw new Error("Missing token address. Please specify the token to sell.");
+        throw new Error(
+          "Missing token address. Please specify the token to sell."
+        );
       }
 
       // Execute trade using TokenTrader service
-      const trader = new TokenTrader();
+      const trader = new TokenTrader(_runtime);
       const result = await trader.manualSell({
         tokenAddress,
         chainName,
         amount, // Pass optional amount for partial sells
         runtime: _runtime,
-        callback: _callback
+        callback: _callback,
       });
 
       if (result.success) {
@@ -53,8 +57,8 @@ export const manualSell: Action = {
           data: {
             ...result,
             chainName,
-            tokenAddress
-          }
+            tokenAddress,
+          },
         });
       }
 
@@ -76,7 +80,7 @@ export const manualSell: Action = {
         content: {
           text: "Sell this token",
           tokenAddress: "0x1234...",
-          chain: "arbitrum"
+          chain: "arbitrum",
         },
       },
       {
@@ -88,4 +92,4 @@ export const manualSell: Action = {
       },
     ],
   ],
-} as Action; 
+} as Action;

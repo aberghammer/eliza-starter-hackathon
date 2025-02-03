@@ -1,5 +1,4 @@
-import { elizaLogger, ICacheManager, stringToUuid } from "@elizaos/core";
-import BetterSQLite3 from "better-sqlite3";
+import { elizaLogger } from "@elizaos/core";
 
 import {
   ActionExample,
@@ -17,8 +16,8 @@ import { TwitterManager } from "../providers/twitter-provider/twitter-base-provi
 import { validateTwitterConfig } from "../providers/twitter-provider/environment.ts";
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 
-import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import type { TokenMetrics } from "../types/TokenMetrics.ts";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
 
 export const tweetMindshare: Action = {
   name: "TWEET_MINDSHARE",
@@ -44,8 +43,9 @@ export const tweetMindshare: Action = {
     try {
       elizaLogger.log("📡 Starting the analyzer...");
 
-      const db = new BetterSQLite3("data/db.sqlite");
-      const tokenMetricsProvider = new TokenMetricsProvider(db);
+      const tokenMetricsProvider = new TokenMetricsProvider(
+        _runtime.getSetting("DB_CONNECTION_STRING")
+      );
       const cookieProvider = new CookieApiProvider(_runtime);
 
       // Initialize the Twitter manager
@@ -58,7 +58,7 @@ export const tweetMindshare: Action = {
       let selectedAgentAddress: string | null = null;
 
       // 🔹 1️⃣ Check for active trades
-      const openTrades = tokenMetricsProvider.getActiveTrades();
+      const openTrades = await tokenMetricsProvider.getActiveTrades();
       elizaLogger.log(`📊 Found ${openTrades.length} active trades`);
 
       if (openTrades.length > 0) {
@@ -68,7 +68,7 @@ export const tweetMindshare: Action = {
             ? openTrades[Math.floor(Math.random() * openTrades.length)]
             : openTrades[0];
 
-        selectedAgentAddress = trade.tokenAddress;
+        selectedAgentAddress = trade.token_address;
         elizaLogger.log("🎯 Selected trade:", selectedAgentAddress);
       } else {
         // ⚠️ No active trades found → Select a random agent from the API
