@@ -29,7 +29,6 @@ import {
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
 import cookieFun from "./plugins/cookie-fun/index.ts";
-import { HOUSEKEEPING_MINUTES, AUTO_START_HOUSEKEEPING_LOOP } from "./plugins/cookie-fun/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -104,68 +103,12 @@ async function startAgent(character: Character, directClient: DirectClient) {
     // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
 
-    // Start housekeeping for this agent
-    //await setupHousekeeping(runtime);
+ 
 
     return runtime;
   } catch (error) {
     elizaLogger.error(`Error starting agent for character ${character.name}:`, error);
     throw error;
-  }
-}
-
-// Set up background housekeeping task
-async function setupHousekeeping(runtime: IAgentRuntime) {
-  const runTasks = async () => {
-    try {
-      const content: Content = {
-        text: "Running periodic housekeeping",
-        source: "system",
-        attachments: []
-      };
-
-      const message: Memory = {
-        id: stringToUuid("housekeeping"),
-        agentId: runtime.agentId,
-        userId: stringToUuid("system"),
-        roomId: stringToUuid("background"),
-        createdAt: Date.now(),
-        content,        
-      };
-
-      const state: State = {
-        bio: "",
-        lore: "",
-        messageDirections: "",
-        postDirections: "",
-        conversationId: stringToUuid("housekeeping"),
-        messageId: stringToUuid("housekeeping"),
-        context: {},
-        memory: [],
-        tokens: 0,
-        roomId: stringToUuid("background"),
-        actors: "",
-        recentMessages: "",
-        recentMessagesData: []
-      };
-
-      await runtime.processActions(
-        message,
-        [message],
-        state,
-        () => Promise.resolve([])
-      );
-    } catch (error) {
-      elizaLogger.error("Background task error:", error);
-    }
-  };
-
-  if (AUTO_START_HOUSEKEEPING_LOOP) {
-    await runTasks();
-    setInterval(runTasks, HOUSEKEEPING_MINUTES * 60 * 1000);
-    elizaLogger.log("🔄 Automatic housekeeping enabled");
-  } else {
-    elizaLogger.log("ℹ️ Housekeeping available via HOUSEKEEPING command");
   }
 }
 
