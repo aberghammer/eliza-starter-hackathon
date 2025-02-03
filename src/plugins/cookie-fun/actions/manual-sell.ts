@@ -30,6 +30,7 @@ export const manualSell: Action = {
       const content = _message.content as any;
       const tokenAddress = content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
       const chainName = content.chain || ACTIVE_CHAIN;
+      const amount = content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount;  // Optional amount for partial sells
 
       if (!tokenAddress) {
         throw new Error("Missing token address. Please specify the token to sell.");
@@ -40,6 +41,7 @@ export const manualSell: Action = {
       const result = await trader.manualSell({
         tokenAddress,
         chainName,
+        amount, // Pass optional amount for partial sells
         runtime: _runtime,
         callback: _callback
       });

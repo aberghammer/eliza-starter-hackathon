@@ -12,6 +12,7 @@ export interface BuyParams {
 export interface SellParams {
   tokenAddress: string;
   chainName: string;
+  amount?: string;
   runtime: IAgentRuntime;
   callback?: HandlerCallback;
 }

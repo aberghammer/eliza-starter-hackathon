@@ -36,7 +36,7 @@ export const manualBuy: Action = {
       const content = _message.content as any;
       const tokenAddress = content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
       const chainName = content.chain || ACTIVE_CHAIN;
-      const amount = content.amount || TRADE_AMOUNT;
+      const amount = content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount || TRADE_AMOUNT;
 
       const trader = new TokenTrader();
       const result = await trader.manualBuy({

@@ -12,7 +12,6 @@ export class HousekeepingService {
   }
 
   async runCycle(runtime: IAgentRuntime, callback?: HandlerCallback): Promise<boolean> {
-    return;
     elizaLogger.log("🔄 Running housekeeping cycle...");
 
     try {
