@@ -1,6 +1,9 @@
 import { elizaLogger } from "@elizaos/core";
 import { ethers } from 'ethers';
-import { TradeLog } from '../types/TradeLog';
+import type { TradeLog } from '../types/TradeLog.ts';
+import { Chain } from '../types/Chain.ts';
+import type { IAgentRuntime } from '@elizaos/core';
+import { ACTIVE_CHAIN } from "../config.ts";
 
 export class TradeExecutionProvider {
   private readonly provider: ethers.JsonRpcProvider;
@@ -9,12 +12,16 @@ export class TradeExecutionProvider {
   private readonly ROUTER_ADDRESS: string;
   private readonly WETH_ADDRESS: string;
 
-  constructor(
-    rpcUrl: string, 
-    privateKey: string,
-    routerAddress: string,
-    wethAddress: string
-  ) {
+  constructor(chain: Chain, runtime: IAgentRuntime) {
+    const rpcUrl = runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`);
+    const privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+    const routerAddress = runtime.getSetting(`${chain.toUpperCase()}_UNISWAP_ROUTER`);
+    const wethAddress = runtime.getSetting(`${chain.toUpperCase()}_WETH`);
+
+    if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
+      throw new Error(`Missing required ${chain} configuration!`);
+    }
+
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
     this.wallet = new ethers.Wallet(privateKey, this.provider);
     this.ROUTER_ADDRESS = routerAddress;
@@ -89,7 +96,7 @@ export class TradeExecutionProvider {
         timestamp: new Date().toISOString()
       };
 
-      elizaLogger.log(`✅ Successfully bought ${symbol} on Arbitrum`, tradeLog);
+      elizaLogger.log(`✅ Successfully bought ${symbol} on ${ACTIVE_CHAIN}`, tradeLog);
       return tradeLog;
 
     } catch (error) {
@@ -193,7 +200,7 @@ export class TradeExecutionProvider {
         timestamp: new Date().toISOString()
       };
 
-      elizaLogger.log(`✅ Successfully sold ${symbol} on Arbitrum`, tradeLog);
+      elizaLogger.log(`✅ Successfully sold ${symbol} on ${ACTIVE_CHAIN}`, tradeLog);
       return tradeLog;
 
     } catch (error) {

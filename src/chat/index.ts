@@ -41,6 +41,9 @@ async function handleUserInput(input, agentId) {
 }
 
 export function startChat(characters) {
+  // Show startup message
+  console.log("Agent: 🚀 Starting up - this may take a minute while I run initial checks...");
+  
   function chat() {
     const agentId = characters[0].name ?? "Agent";
     rl.question("You: ", async (input) => {

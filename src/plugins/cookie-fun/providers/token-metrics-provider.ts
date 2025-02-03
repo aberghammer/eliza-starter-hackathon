@@ -1,50 +1,77 @@
 import BetterSQLite3 from "better-sqlite3";
-
-export interface TokenMetrics {
-  tokenAddress: string;
-  symbol: string;
-  mindshare: number;
-  sentimentScore: number;
-  liquidity: number;
-  priceChange24h: number;
-  holderDistribution: string;
-  timestamp: string;
-  buySignal: boolean;
-  sellSignal?: boolean;
-  entryPrice?: number;
-  exitPrice?: number;
-  profitLoss?: number;
-}
+import { elizaLogger } from "@elizaos/core";
+import type { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export class TokenMetricsProvider {
-  private db: BetterSQLite3.Database;
-
-  constructor(db: BetterSQLite3.Database) {
-    this.db = db;
-    this.initializeSchema();
+  constructor(private db: BetterSQLite3.Database) {
+    this.initializeDatabase();
   }
 
-  /**
-   * Erstellt die Tabelle, falls sie nicht existiert.
-   */
-  private initializeSchema() {
+  private initializeDatabase() {
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS token_metrics (
-        tokenAddress TEXT PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        tokenAddress TEXT NOT NULL,
+        chainId INTEGER NOT NULL,
+        chainName TEXT NOT NULL,
         symbol TEXT NOT NULL,
-        mindshare REAL NOT NULL,
-        sentimentScore REAL NOT NULL,
-        liquidity REAL NOT NULL,
-        priceChange24h REAL NOT NULL,
-        holderDistribution TEXT NOT NULL,
+        mindshare REAL DEFAULT 0,
+        sentimentScore REAL DEFAULT 0,
+        liquidity REAL DEFAULT 0,
+        priceChange24h REAL DEFAULT 0,
+        holderDistribution TEXT,
         timestamp TEXT NOT NULL,
-        buySignal BOOLEAN NOT NULL,
-        sellSignal BOOLEAN,
+        buySignal BOOLEAN DEFAULT FALSE,
+        sellSignal BOOLEAN DEFAULT FALSE,
         entryPrice REAL,
         exitPrice REAL,
-        profitLoss REAL
+        profitLoss REAL,
+        finalized BOOLEAN DEFAULT FALSE,
+        UNIQUE(tokenAddress, chainId)
       );
     `);
+  }
+
+  getTokensToSell(): TokenMetrics[] {
+    return this.db.prepare(`
+      SELECT * FROM token_metrics 
+      WHERE sellSignal = TRUE 
+      AND finalized = FALSE
+    `).all();
+  }
+
+  getTokensToBuy(): TokenMetrics[] {
+    return this.db.prepare(`
+      SELECT * FROM token_metrics 
+      WHERE buySignal = TRUE 
+      AND finalized = FALSE
+    `).all();
+  }
+
+  getActiveTrades(): TokenMetrics[] {
+    return this.db.prepare(`
+      SELECT * FROM token_metrics 
+      WHERE entryPrice IS NOT NULL 
+      AND finalized = FALSE
+    `).all();
+  }
+
+  flagForSelling(tokenAddress: string, chainId: number) {
+    this.db.prepare(`
+      UPDATE token_metrics 
+      SET sellSignal = TRUE 
+      WHERE tokenAddress = ? AND chainId = ?
+    `).run(tokenAddress, chainId);
+  }
+
+  finalizeTrade(tokenAddress: string, chainId: number, exitPrice: number, profitLoss: number) {
+    this.db.prepare(`
+      UPDATE token_metrics 
+      SET finalized = TRUE,
+          exitPrice = ?,
+          profitLoss = ?
+      WHERE tokenAddress = ? AND chainId = ?
+    `).run(exitPrice, profitLoss, tokenAddress, chainId);
   }
 
   /**
@@ -53,10 +80,13 @@ export class TokenMetricsProvider {
   upsertTokenMetrics(metrics: TokenMetrics): boolean {
     const sql = `
       INSERT INTO token_metrics (
-        tokenAddress, symbol, mindshare, sentimentScore, liquidity, priceChange24h,
-        holderDistribution, timestamp, buySignal, sellSignal, entryPrice, exitPrice, profitLoss
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(tokenAddress) DO UPDATE SET
+        tokenAddress, chainId, chainName, symbol, mindshare, sentimentScore, 
+        liquidity, priceChange24h, holderDistribution, timestamp, 
+        buySignal, sellSignal, entryPrice, exitPrice, profitLoss, finalized
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(tokenAddress, chainId) DO UPDATE SET
+        chainName = excluded.chainName,
+        symbol = excluded.symbol,
         mindshare = excluded.mindshare,
         sentimentScore = excluded.sentimentScore,
         liquidity = excluded.liquidity,
@@ -67,26 +97,29 @@ export class TokenMetricsProvider {
         sellSignal = excluded.sellSignal,
         entryPrice = excluded.entryPrice,
         exitPrice = excluded.exitPrice,
-        profitLoss = excluded.profitLoss;
+        profitLoss = excluded.profitLoss,
+        finalized = excluded.finalized;
     `;
 
     try {
       this.db.prepare(sql).run(
         metrics.tokenAddress,
+        metrics.chainId,
+        metrics.chainName,
         metrics.symbol,
         metrics.mindshare,
         metrics.sentimentScore,
         metrics.liquidity,
         metrics.priceChange24h,
-        JSON.stringify(metrics.holderDistribution ?? ""), // Falls ein Objekt, in JSON umwandeln
-        metrics.timestamp.toString(),
-        metrics.buySignal ? 1 : 0, // Boolean in 1/0 umwandeln
+        metrics.holderDistribution,
+        metrics.timestamp,
+        metrics.buySignal ? 1 : 0,
         metrics.sellSignal ? 1 : 0,
         metrics.entryPrice ?? null,
         metrics.exitPrice ?? null,
-        metrics.profitLoss ?? null
+        metrics.profitLoss ?? null,
+        metrics.finalized ? 1 : 0
       );
-
       console.log(`✅ TokenMetrics für ${metrics.tokenAddress} gespeichert.`);
       return true;
     } catch (error) {
@@ -146,22 +179,6 @@ export class TokenMetricsProvider {
       return rows;
     } catch (error) {
       console.error("❌ Fehler beim Abrufen der Token-Metriken:", error);
-      return [];
-    }
-  }
-
-  public getActiveTrades(): TokenMetrics[] {
-    const sql = `
-      SELECT * FROM token_metrics
-      WHERE entryPrice IS NOT NULL AND exitPrice IS NULL
-      ORDER BY timestamp DESC;
-    `;
-
-    try {
-      const rows = this.db.prepare(sql).all() as TokenMetrics[];
-      return rows;
-    } catch (error) {
-      console.error("❌ Fehler beim Abrufen der offenen Trades:", error);
       return [];
     }
   }

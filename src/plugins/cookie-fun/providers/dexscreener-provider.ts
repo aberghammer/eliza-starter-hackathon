@@ -1,4 +1,5 @@
 import { elizaLogger } from "@elizaos/core";
+import type { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export class DexscreenerProvider {
   private readonly API_URL = "https://api.dexscreener.com/latest/dex/tokens/";

@@ -17,10 +17,8 @@ import { TwitterManager } from "../providers/twitter-provider/twitter-base-provi
 import { validateTwitterConfig } from "../providers/twitter-provider/environment.ts";
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 
-import {
-  TokenMetrics,
-  TokenMetricsProvider,
-} from "../providers/token-metrics-provider.ts";
+import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+import type { TokenMetrics } from "../types/TokenMetrics.ts";
 
 export const tweetMindshare: Action = {
   name: "TWEET_MINDSHARE",
@@ -267,7 +265,7 @@ export const tweetMindshare: Action = {
       {
         user: "{{eliza}}",
         content: {
-          text: "🚀 Here’s a key insight: '$TOKEN is gaining momentum with a 25% increase in smart holders.'",
+          text: "🚀 Here's a key insight: '$TOKEN is gaining momentum with a 25% increase in smart holders.'",
           action: "ANALYZE_DATA",
         },
       },
@@ -304,7 +302,7 @@ export const tweetMindshare: Action = {
       {
         user: "{{user5}}",
         content: {
-          text: "What’s trending in crypto today?",
+          text: "What's trending in crypto today?",
         },
       },
       {

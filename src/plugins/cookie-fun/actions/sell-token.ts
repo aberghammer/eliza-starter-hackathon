@@ -1,21 +1,24 @@
 import { elizaLogger } from "@elizaos/core";
 import {
-  ActionExample,
-  HandlerCallback,
-  IAgentRuntime,
-  Memory,
-  State,
+  type ActionExample,
+  type HandlerCallback,
+  type IAgentRuntime,
+  type Memory,
+  type State,
   type Action,
 } from "@elizaos/core";
 import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
+import { Chain } from '../types/Chain.ts';
+import { ACTIVE_CHAIN } from '../config.ts';
+import { stringToChain } from '../utils/chain-utils.ts';
 
 export const sellToken: Action = {
   name: "SELL_TOKEN",
   similes: ["SELL", "DISPOSE TOKEN", "EXECUTE SELL", "SELL ON ARBITRUM", "MANUAL SELL", "triggerword"],
-  description: "Sells a token on Arbitrum using SushiSwap",
+  description: "Sells a token on a given Chain using SushiSwap",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
@@ -61,14 +64,15 @@ export const sellToken: Action = {
 
       elizaLogger.log(`🔄 Using token address: ${tokenAddress}`);
 
-      // Get token balance
-      const rpcUrl = _runtime.getSetting("ARBITRUM_RPC_URL");
-      const privateKey = _runtime.getSetting("ARBITRUM_WALLET_PRIVATE_KEY");
-      const routerAddress = _runtime.getSetting("ARBITRUM_UNISWAP_ROUTER");
-      const wethAddress = _runtime.getSetting("ARBITRUM_WETH");
+      // Get selected Chain configuration
+      const selectedChain = (_message.content as any).chain || ACTIVE_CHAIN;
+      const rpcUrl = _runtime.getSetting(`${selectedChain.toUpperCase()}_RPC_URL`);
+      const privateKey = _runtime.getSetting(`${selectedChain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+      const routerAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_UNISWAP_ROUTER`);
+      const wethAddress = _runtime.getSetting(`${selectedChain.toUpperCase()}_WETH`);
 
       if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
-        throw new Error("Missing required Arbitrum configuration!");
+        throw new Error(`Missing required ${selectedChain} configuration!`);
       }
 
       const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -86,10 +90,8 @@ export const sellToken: Action = {
       elizaLogger.log(`🔄 Starting token sale for ${tokenAddress} with balance ${balance}`);
 
       const tradeExecutor = new TradeExecutionProvider(
-        rpcUrl,
-        privateKey,
-        routerAddress,
-        wethAddress
+        stringToChain(selectedChain),
+        _runtime
       );
 
       // Execute the sell with full balance
@@ -123,14 +125,27 @@ export const sellToken: Action = {
       // Update database with trade info
       tokenMetricsProvider.updateExitPrice(tokenAddress, exitPrice, profitLossPercent);
 
-      _callback({
-        text: `Successfully sold ${tradeResult.symbol} for ${ethers.formatEther(balance)} tokens at price ${exitPrice} (${profitLossPercent > 0 ? '+' : ''}${profitLossPercent}%)\nTransaction: https://arbiscan.io/tx/${tradeResult.tradeId}`.replace(/\n/g, ' '),
-        action: "TOKEN_SOLD",
-        data: {
-          ...tradeResult,
-          profitLossPercent
-        }
-      });
+      const explorerUrls = {
+        [Chain.ARBITRUM]: 'https://arbiscan.io/tx/',
+        [Chain.MODE]: 'https://explorer.mode.network/tx/',
+        [Chain.AVALANCHE]: 'https://snowtrace.io/tx/'
+      };
+
+      if (tradeResult) {
+        _callback({
+          text: `📝 Token queued for selling | Token: ${tradeResult.symbol} | Chain: ${ACTIVE_CHAIN} | Status: Ready to execute on next cycle`,
+          action: "SELL_TOKEN_QUEUED",
+          data: {
+            ...tradeResult,
+            chain: ACTIVE_CHAIN
+          }
+        });
+      } else {
+        _callback({
+          text: `❌ Failed to queue token for selling: Trade execution failed`,
+          action: "SELL_TOKEN_ERROR"
+        });
+      }
 
       return true;
     } catch (error) {
@@ -143,7 +158,6 @@ export const sellToken: Action = {
         text: `Failed to sell token: ${error.message}`,
         action: "SELL_ERROR",
       });
-
       return false;
     }
   },
@@ -167,4 +181,87 @@ export const sellToken: Action = {
       },
     ],
   ] as ActionExample[][],
-} as Action; 
+} as Action;
+
+export class SellTokenAction {
+  private tokenMetricsProvider: TokenMetricsProvider;
+  private db: BetterSQLite3.Database;
+
+  constructor() {
+    this.db = new BetterSQLite3("data/db.sqlite");
+    this.tokenMetricsProvider = new TokenMetricsProvider(this.db);
+  }
+
+  async executeSell(runtime: IAgentRuntime) {
+    try {
+      // Get tokens marked for selling
+      const tokensToSell = this.tokenMetricsProvider.getTokensToSell();
+      
+      for (const token of tokensToSell) {
+        try {
+          // Initialize trade executor for this chain
+          const tradeExecutor = new TradeExecutionProvider(
+            stringToChain(token.chainName),
+            runtime
+          );
+
+          // Get token balance
+          const provider = new ethers.JsonRpcProvider(
+            runtime.getSetting(`${token.chainName.toUpperCase()}_RPC_URL`)
+          );
+          const wallet = new ethers.Wallet(
+            runtime.getSetting(`${token.chainName.toUpperCase()}_WALLET_PRIVATE_KEY`),
+            provider
+          );
+          
+          const tokenContract = new ethers.Contract(
+            token.tokenAddress,
+            ["function balanceOf(address) view returns (uint256)"],
+            provider
+          );
+          
+          const balance = await tokenContract.balanceOf(wallet.address);
+
+          if (balance === BigInt(0)) {
+            elizaLogger.error(`No balance to sell for ${token.symbol}`);
+            continue;
+          }
+
+          // Execute the sell
+          const tradeResult = await tradeExecutor.sellToken(
+            token.tokenAddress,
+            balance.toString()
+          );
+
+          if (!tradeResult) {
+            elizaLogger.error(`Failed to sell ${token.symbol}`);
+            continue;
+          }
+
+          // Calculate profit/loss
+          const profitLossPercent = Math.round(
+            ((tradeResult.price - token.entryPrice!) / token.entryPrice!) * 100
+          );
+
+          // Finalize the trade in database
+          this.tokenMetricsProvider.finalizeTrade(
+            token.tokenAddress,
+            token.chainId,
+            tradeResult.price,
+            profitLossPercent
+          );
+
+          elizaLogger.log(`✅ Sold ${token.symbol} at ${profitLossPercent}% ${profitLossPercent >= 0 ? 'profit' : 'loss'}`);
+
+        } catch (error) {
+          elizaLogger.error(`❌ Error selling ${token.symbol}:`, error);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      elizaLogger.error("❌ Error in sell execution:", error);
+      return false;
+    }
+  }
+} 

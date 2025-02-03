@@ -1,17 +1,24 @@
-import { elizaLogger, ICacheManager, UUID } from "@elizaos/core";
-import {
-  ActionExample,
-  HandlerCallback,
-  IAgentRuntime,
-  Memory,
-  State,
-  type Action,
+import { 
+  elizaLogger, 
+  type Action, 
+  type IAgentRuntime, 
+  type Memory,
+  type State,
+  type HandlerCallback 
 } from "@elizaos/core";
+import { HousekeepingService } from "../services/housekeeping.ts";
+import { HOUSEKEEPING_MINUTES } from "../config.ts";
 
 export const housekeeping: Action = {
   name: "HOUSEKEEPING",
-  similes: ["HOUSEKEEPING", "CLEANING", "MAINTENANCE"],
-  description: "Periodic maintenance tasks.",
+  similes: [
+    "HOUSEKEEPING",
+  //  "MAINTENANCE",
+  //  "RUN TASKS",
+  //  "START HOUSEKEEPING",
+  //  "AUTOMATIC"
+  ],
+  description: "Run automated trading tasks. Use 'loop' parameter to run continuously",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
@@ -26,59 +33,62 @@ export const housekeeping: Action = {
   ): Promise<boolean> => {
     try {
 
+      const service = new HousekeepingService();
       
-      //-------------------------------Stellschrauben--------------------------------
-      const loopAfterXMinutes = 60; //Forces a sell simulating a profit taking, instead of waiting to hit the rules (above 30% gains or below 20% loss)
-      //-------------------------------Stellschrauben--------------------------------
-
-
-      const runHousekeeping = async () => {
-        elizaLogger.log("📡 Running housekeeping tasks...");
-
-        // Define which actions to run periodically
-        const actionsToRun = ["ANALYZE_DATA", "CHECK_SELL"];
-
-        // Create memory objects for each action
-        const actionMemories: Memory[] = actionsToRun.map(actionName => ({
-          id: `${_message.id}-${actionName.toLowerCase()}` as UUID,
-          agentId: _runtime.agentId,
-          userId: _message.userId,
-          roomId: _message.roomId,
-          createdAt: Date.now(),
-          content: {
-            text: `Running periodic ${actionName}`,
-            action: actionName,
-            source: "housekeeping"
-          },
-        }));
-
-        // Execute all actions
-        for (const memory of actionMemories) {
-          await _runtime.processActions(
-            memory,
-            [memory],
-            _state,
-            async (result) => {
-              if (result.action?.includes("ERROR")) {
-                elizaLogger.error(`❌ Housekeeping ${memory.content.action} failed`);
-              }
-              return [];  // Return empty array to satisfy Promise<Memory[]>
-            }
-          );
+     /* // Initial callback with mode info
+      _callback?.({
+        text: "🔄 Starting housekeeping tasks...",
+        action: "HOUSEKEEPING_START",
+        data: {
+          mode: _message.content.text?.toLowerCase().includes('loop') ? 'continuous' : 'single',
+          startTime: new Date().toISOString()
         }
-      };
+      });*/
 
-      // Initial run
-      await runHousekeeping();
-      elizaLogger.log("✅ Housekeeping tasks completed successfully");
+      const result = await service.runCycle(_runtime, _callback);
+      
+      // Check if loop parameter was passed
+      const shouldLoop = (_message.content as any).text?.toLowerCase().includes('loop');
 
-      // Run every 5 minutes
-      const INTERVAL = loopAfterXMinutes * 60 * 1000; // 5 minutes in milliseconds
-      setInterval(runHousekeeping, INTERVAL);
+      if (result && shouldLoop && !global.housekeepingInterval) {
+        global.housekeepingInterval = setInterval(
+          () => service.runCycle(_runtime, _callback),
+          HOUSEKEEPING_MINUTES * 60 * 1000
+        );
 
-      return true;
+        // Scheduling message only for loop mode
+        _callback?.({
+          text: `✅ Housekeeping scheduled | Interval: ${HOUSEKEEPING_MINUTES}min | Next run: ${new Date(Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000).toLocaleTimeString()}`,
+          action: "HOUSEKEEPING_SCHEDULED",
+          data: {
+            intervalMinutes: HOUSEKEEPING_MINUTES,
+            nextRun: new Date(Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000).toISOString()
+          }
+        });
+      } else if (result) {
+        // Single run completion message
+        _callback?.({
+          text: `✅ Housekeeping cycle complete | Tasks executed: Market analysis, Buy orders, Sell checks | Duration: ${Date.now() - new Date(_message.createdAt).getTime()}ms`,
+          action: "HOUSEKEEPING_COMPLETE",
+          data: {
+            duration: Date.now() - new Date(_message.createdAt).getTime(),
+            mode: 'single'
+          }
+        });
+      }
+
+      return result;
     } catch (error) {
-      elizaLogger.error("❌ Error in housekeeping:", error);
+      // Enhanced error callback
+      _callback?.({
+        text: `❌ Housekeeping error: ${error.message}`,
+        action: "HOUSEKEEPING_ERROR",
+        data: {
+          error: error.message,
+          timestamp: new Date().toISOString()
+        }
+      });
+      elizaLogger.error("Error in housekeeping:", error);
       return false;
     }
   },
@@ -88,46 +98,16 @@ export const housekeeping: Action = {
       {
         user: "{{user1}}",
         content: {
-          text: "Can you run the housekeeping tasks?",
+          text: "Run housekeeping tasks with loop",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Starting housekeeping tasks now. Please wait...",
+          text: "Starting continuous housekeeping tasks",
           action: "HOUSEKEEPING",
         },
       },
     ],
-    [
-      {
-        user: "{{user2}}",
-        content: {
-          text: "I need you to handle the housekeeping.",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Running housekeeping tasks like analyzing data and checking sell opportunities.",
-          action: "HOUSEKEEPING",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user3}}",
-        content: {
-          text: "Execute the housekeeping routine.",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Housekeeping tasks are being executed now.",
-          action: "HOUSEKEEPING",
-        },
-      },
-    ],
-  ] as ActionExample[][],
+  ],
 } as Action;

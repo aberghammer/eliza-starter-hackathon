@@ -28,7 +28,7 @@ import {
   parseArguments,
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
-import { cookieFun } from "./plugins/cookie-fun/index.ts";
+import cookieFun from "./plugins/cookie-fun/index.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -88,11 +88,11 @@ async function startAgent(character: Character, directClient: DirectClient) {
     }
 
     const db = initializeDatabase(dataDir);
-
     await db.init();
 
     const cache = initializeDbCache(character, db);
     const runtime = createAgent(character, db, cache, token);
+
 
     await runtime.initialize();
 
@@ -103,69 +103,13 @@ async function startAgent(character: Character, directClient: DirectClient) {
     // report to console
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
 
-    // Start housekeeping for this agent
-    await setupHousekeeping(runtime);
+ 
 
     return runtime;
   } catch (error) {
     elizaLogger.error(`Error starting agent for character ${character.name}:`, error);
     throw error;
   }
-}
-
-// Set up background housekeeping task
-async function setupHousekeeping(runtime: IAgentRuntime) {
-  const INTERVAL = 5 * 60 * 1000;
-  
-  const runTasks = async () => {
-    try {
-      const content: Content = {
-        text: "Running periodic housekeeping",
-        action: "HOUSEKEEPING",
-        source: "system",
-        attachments: []
-      };
-
-      const message: Memory = {
-        id: stringToUuid("housekeeping"),
-        agentId: runtime.agentId,
-        userId: stringToUuid("system"),
-        roomId: stringToUuid("background"),
-        createdAt: Date.now(),
-        content,        
-      };
-
-      const state: State = {
-        bio: "",
-        lore: "",
-        messageDirections: "",
-        postDirections: "",
-        conversationId: stringToUuid("housekeeping"),
-        messageId: stringToUuid("housekeeping"),
-        context: {},
-        memory: [],
-        tokens: 0,
-        roomId: stringToUuid("background"),
-        actors: "",
-        recentMessages: "",
-        recentMessagesData: []
-      };
-
-      await runtime.processActions(
-        message,
-        [message],
-        state,
-        () => Promise.resolve([])
-      );
-
-      elizaLogger.log("✅ Housekeeping tasks completed successfully");
-    } catch (error) {
-      elizaLogger.error("Background task error:", error);
-    }
-  };
-
-  await runTasks();
-  setInterval(runTasks, INTERVAL);
 }
 
 const checkPortAvailable = (port: number): Promise<boolean> => {

@@ -1,7 +1,7 @@
-//Nur ein Vorschlag, wie die Struktur der Token-Metriken aussehen könnte
-
 export interface TokenMetrics {
   tokenAddress: string; // Die Smart Contract Adresse des Tokens
+  chainId: number;
+  chainName: string;
   symbol: string; // Token Symbol (z. B. SOL, ETH, BTC)
   mindshare: number; // Wert von Cookie API (wie oft wird darüber geredet?)
   sentimentScore: number; // Wert von Twitter Sentiment Analyse (-1 bis 1)
@@ -14,4 +14,5 @@ export interface TokenMetrics {
   entryPrice?: number; // Preis, zu dem gekauft wurde
   exitPrice?: number; // Preis, zu dem verkauft wurde
   profitLoss?: number; // Gewinn oder Verlust nach dem Verkauf in %
+  finalized: boolean;
 }

@@ -1,132 +1,65 @@
-import { elizaLogger } from "@elizaos/core";
-import {
-  ActionExample,
-  HandlerCallback,
-  IAgentRuntime,
-  Memory,
-  State,
-  type Action,
+import { 
+  elizaLogger, 
+  type Action, 
+  type IAgentRuntime, 
+  type Memory,
+  type State,
+  type HandlerCallback 
 } from "@elizaos/core";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
-import BetterSQLite3 from "better-sqlite3";
-import { ethers } from "ethers";
-
-
+import { TokenTrader } from "../services/token-trader.ts";
+import { ACTIVE_CHAIN, TRADE_AMOUNT } from '../config.ts';
 
 export const buyToken: Action = {
   name: "BUY_TOKEN",
-  similes: ["BUY", "PURCHASE TOKEN", "EXECUTE BUY", "BUY ON ARBITRUM"],
-  description: "Buys a token on Arbitrum using SushiSwap",
+  similes: ["BUY Token", 
+    //"BUY", 
+    // //"PURCHASE TOKEN"
+     ],
+  description: "Flag a token for buying",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return true; 
+    return true;
   },
 
   handler: async (
-    _runtime: IAgentRuntime,
+    runtime: IAgentRuntime,
     _message: Memory,
     _state: State,
     _options: { [key: string]: unknown },
-    _callback: HandlerCallback
+    callback?: HandlerCallback
   ): Promise<boolean> => {
     try {
-      let tokenAddress: string;
-      let amountInEth: string;
+      const trader = new TokenTrader();
+      const result = await trader.processPendingBuys(runtime);
 
-      // Try to get from content object first
-      if (typeof _message.content === 'object' && _message.content !== null) {
-        tokenAddress = (_message.content as { tokenAddress?: string }).tokenAddress;
-        amountInEth = (_message.content as { amountInEth?: string }).amountInEth;
+      if (callback) {
+        if (result.success) {
+          callback({
+            text: `🛍️ Buy orders processed | ${result.symbol ? `Bought: ${result.symbol} | ` : ''}Amount per trade: ${TRADE_AMOUNT} ETH | Chain: ${ACTIVE_CHAIN} | Status: Transaction${result.symbol ? '' : 's'} complete`,
+            action: "BUY_TOKEN_COMPLETE",
+            data: {
+              ...result,
+              chain: ACTIVE_CHAIN,
+              tradeAmount: TRADE_AMOUNT
+            }
+          });
+        } else {
+          callback({
+            text: `❌ Failed to process buy orders: ${result.error}`,
+            action: "BUY_TOKEN_ERROR"
+          });
+        }
       }
 
-      // If not found, try to parse from text
-      if (!tokenAddress || !amountInEth) {
-        const text = _message.content.text as string;
-        // Match address (0x...) and ETH amount
-        const addressMatch = text.match(/0x[a-fA-F0-9]{40}/);
-        const amountMatch = text.match(/(\d+\.?\d*)\s*eth/i);
-        
-        tokenAddress = addressMatch?.[0];
-        amountInEth = amountMatch?.[1];
-      }
-
-      if (!tokenAddress || !amountInEth) {
-        throw new Error("Missing required parameters. Please specify token address and ETH amount.");
-      }
-      
-      // Make sure we're working with a valid number string
-      const amountInWei = ethers.parseEther(amountInEth as string).toString();
-      
-
-      elizaLogger.log(`🔄 Starting token purchase for ${tokenAddress} with ${amountInEth} ETH`);
-
-      // Get Arbitrum configuration
-      const rpcUrl = _runtime.getSetting("ARBITRUM_RPC_URL");
-      const privateKey = _runtime.getSetting("ARBITRUM_WALLET_PRIVATE_KEY");
-      const routerAddress = _runtime.getSetting("ARBITRUM_UNISWAP_ROUTER");
-      const wethAddress = _runtime.getSetting("ARBITRUM_WETH");
-
-      if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
-        throw new Error("Missing required Arbitrum configuration!");
-      }
-
-      // Initialize trade executor
-      const tradeExecutor = new TradeExecutionProvider(
-        rpcUrl,
-        privateKey,
-        routerAddress,
-        wethAddress
-      );
-
-      // Execute the buy
-      const tradeResult = await tradeExecutor.buyToken(
-        tokenAddress as string,
-        amountInWei
-      );
-
-      if (!tradeResult) {
-        throw new Error("Trade execution returned null result");
-      }
-
-
-      // Update database with trade info
-      const db = new BetterSQLite3("data/db.sqlite");
-      const tokenMetricsProvider = new TokenMetricsProvider(db);
-
-      const metrics = {
-        tokenAddress: tokenAddress as string,
-        symbol: tradeResult.symbol,
-        mindshare: 0, // These will be updated by analyze-data
-        sentimentScore: 0,
-        liquidity: 0,
-        priceChange24h: 0,
-        holderDistribution: "",
-        timestamp: new Date().toISOString(),
-        buySignal: true,
-        entryPrice: tradeResult.price,
-      };
-
-      tokenMetricsProvider.upsertTokenMetrics(metrics);
-
-      _callback({
-        text: `Successfully bought ${tokenAddress} for ${amountInEth} ETH\nTransaction: https://arbiscan.io/tx/${tradeResult.tradeId}`.replace(/\n/g, ' '),
-        action: "TOKEN_BOUGHT",
-        data: tradeResult
-      });
-
-      return true;
+      return result.success;
     } catch (error) {
-      elizaLogger.error("❌ Error buying token:", {
-        error,
-        message: error.message,
-        stack: error.stack
-      });
-      _callback({
-        text: `Failed to buy token: ${error.message}`,
-        action: "BUY_ERROR",
-      });
-
+      elizaLogger.error("❌ Error in buy action:", error);
+      if (callback) {
+        callback({
+          text: `Failed to buy token: ${error.message}`,
+          action: "BUY_ERROR",
+        });
+      }
       return false;
     }
   },
@@ -136,35 +69,19 @@ export const buyToken: Action = {
       {
         user: "{{user1}}",
         content: {
-          text: "Buy this token for me",
+          text: "Buy this token",
           tokenAddress: "0x1234...",
-          amountInEth: "0.00001"
+          chain: "arbitrum",
+          amount: "0.1"
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Executing token purchase on Arbitrum",
+          text: "Executing token purchase",
           action: "BUY_TOKEN",
         },
       },
     ],
-    [
-      {
-        user: "{{user2}}",
-        content: {
-          text: "Execute a buy order",
-          tokenAddress: "0x5678...",
-          amountInEth: "0.0001"
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Initiating token purchase on Arbitrum",
-          action: "BUY_TOKEN",
-        },
-      },
-    ],
-  ] as ActionExample[][],
+  ],
 } as Action; 
