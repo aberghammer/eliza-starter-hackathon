@@ -9,6 +9,7 @@ export const TRADE_AMOUNT = '0.0001'; // ETH
 export const PROFIT_TARGET = 30; // 30%
 export const STOP_LOSS = -20; // -20%
 export const HOUSEKEEPING_MINUTES = 5; // Run every X minutes
+export const AUTO_START_HOUSEKEEPING_LOOP = false; // Set to true to start automatically
 
 
 // Chain configurations

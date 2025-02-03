@@ -29,7 +29,7 @@ import {
 } from "./config/index.ts";
 import { initializeDatabase } from "./database/index.ts";
 import cookieFun from "./plugins/cookie-fun/index.ts";
-import { HOUSEKEEPING_MINUTES } from "./plugins/cookie-fun/config.ts";
+import { HOUSEKEEPING_MINUTES, AUTO_START_HOUSEKEEPING_LOOP } from "./plugins/cookie-fun/config.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,11 +89,11 @@ async function startAgent(character: Character, directClient: DirectClient) {
     }
 
     const db = initializeDatabase(dataDir);
-
     await db.init();
 
     const cache = initializeDbCache(character, db);
     const runtime = createAgent(character, db, cache, token);
+
 
     await runtime.initialize();
 
@@ -161,8 +161,13 @@ async function setupHousekeeping(runtime: IAgentRuntime) {
     }
   };
 
-  await runTasks();
-  setInterval(runTasks, HOUSEKEEPING_MINUTES * 60 * 1000);
+  if (AUTO_START_HOUSEKEEPING_LOOP) {
+    await runTasks();
+    setInterval(runTasks, HOUSEKEEPING_MINUTES * 60 * 1000);
+    elizaLogger.log("🔄 Automatic housekeeping enabled");
+  } else {
+    elizaLogger.log("ℹ️ Housekeeping available via HOUSEKEEPING command");
+  }
 }
 
 const checkPortAvailable = (port: number): Promise<boolean> => {
