@@ -3,6 +3,7 @@ import {
   elizaLogger,
   ModelClass,
   stringToUuid,
+  UUID,
 } from "@elizaos/core";
 import {
   ActionExample,
@@ -45,6 +46,97 @@ export class TwitterInteractionClient {
       result.push(array.slice(i, i + size));
     }
     return result;
+  }
+
+  /**
+   * Fetches tweet contents based on an array of tweet IDs.
+   */
+  async fetchTweetsById(tweetIds: string[]): Promise<Tweet[]> {
+    const allValidTweets = [];
+
+    for (const tweetId of tweetIds) {
+      try {
+        // Fetch individual tweet content
+        const tweet = await this.client.twitterClient.getTweet(tweetId);
+
+        if (tweet) {
+          elizaLogger.log(`📜 Retrieved tweet content: ${tweet.text}`);
+          allValidTweets.push(tweet);
+        }
+      } catch (error) {
+        elizaLogger.error(`❌ Error retrieving tweet ${tweetId}:`, error);
+        continue;
+      }
+    }
+
+    return allValidTweets;
+  }
+
+  /**
+   * Generates a Twitter post based on fetched tweets and posts it.
+   */
+  async generateAndPostTweet(tweetContents: Tweet[], roomId: UUID) {
+    // Check if there are valid tweets to process
+    if (!tweetContents || tweetContents.length === 0) {
+      elizaLogger.log("❌ No tweets found, nothing to post.");
+      return;
+    }
+
+    elizaLogger.log("✅ Loaded tweets for processing:", tweetContents.length);
+
+    // Format tweets into a readable structure for AI processing
+    const combinedText = tweetContents
+      .map((tweet) => `${tweet.username}: "${tweet.text}"`)
+      .join("\n\n");
+
+    // Prepare the state for the LLM (Language Model) to generate a tweet
+    const state = await this.runtime.composeState({
+      userId: this.runtime.agentId,
+      roomId: roomId,
+      agentId: this.runtime.agentId,
+      content: { text: combinedText },
+    });
+
+    // Define the LLM prompt for tweet generation
+    const context = composeContext({
+      state,
+      template: `
+        Here are some recent tweets:
+        ${combinedText}
+        
+        Task:
+    
+        - Analyze the most relevant topics from the tweets.
+        - Create a short and engaging Twitter post.
+        - The tweet must be **186 characters or less** (strict limit).
+        - Keep it concise, impactful, and aligned with crypto trends.
+        - Avoid generic statements—provide insights or a bold statement.
+        - **Do NOT add quotation marks or any extra formatting around the tweet.** Just return the text.
+        
+        Example format:
+        🔥 $TOKEN just hit a new high! 🚀 On-chain data shows a 35% volume spike. #Crypto #DeFi
+    
+        Respond with only the tweet text, nothing else.
+      `,
+    });
+
+    // Generate the tweet using the AI model
+    const summary = await generateText({
+      runtime: this.runtime,
+      context,
+      modelClass: ModelClass.SMALL, // Upgrade to MEDIUM/LARGE if needed
+    });
+
+    elizaLogger.log("📢 Generated Tweet:", summary);
+
+    // Check if the generated tweet is valid
+    if (!summary || summary.length === 0) {
+      elizaLogger.log("❌ No tweet generated, aborting.");
+      return;
+    }
+
+    // 🚀 **Post the generated tweet**
+    await this.postTweet(summary);
   }
 
   /**
@@ -92,6 +184,38 @@ export class TwitterInteractionClient {
 
     // Starte den Prozess
     processBatch();
+  }
+
+  async postTweet(content: string) {
+    if (!content || content.length === 0) {
+      elizaLogger.log("❌ Kein Tweet-Inhalt vorhanden, Abbruch.");
+      return;
+    }
+
+    // ✂️ Kürze den Tweet, falls er zu lang ist
+    if (content.length > 280) {
+      content = content.slice(0, 277) + "...";
+      elizaLogger.log(`✂️ Tweet war zu lang, gekürzt: "${content}"`);
+    }
+
+    try {
+      const response = await this.client.twitterClient.sendTweet(content);
+
+      const body = await response.json();
+
+      if (!body?.data?.id) {
+        elizaLogger.error(
+          "❌ Fehler beim Tweet-Posten, keine ID zurückgegeben:",
+          body
+        );
+        return;
+      }
+
+      elizaLogger.log("✅ Tweet erfolgreich gepostet:", body);
+      return body;
+    } catch (error) {
+      elizaLogger.error("❌ Fehler beim Posten des Tweets:", error);
+    }
   }
 
   /**

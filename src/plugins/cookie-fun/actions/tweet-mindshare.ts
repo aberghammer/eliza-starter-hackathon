@@ -1,4 +1,5 @@
-import { elizaLogger, ICacheManager } from "@elizaos/core";
+import { elizaLogger, ICacheManager, stringToUuid } from "@elizaos/core";
+import BetterSQLite3 from "better-sqlite3";
 
 import {
   ActionExample,
@@ -15,6 +16,11 @@ import { TwitterManager } from "../providers/twitter-provider/twitter-base-provi
 
 import { validateTwitterConfig } from "../providers/twitter-provider/environment.ts";
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
+
+import {
+  TokenMetrics,
+  TokenMetricsProvider,
+} from "../providers/token-metrics-provider.ts";
 
 export const tweetMindshare: Action = {
   name: "TWEET_MINDSHARE",
@@ -38,114 +44,139 @@ export const tweetMindshare: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
-      elizaLogger.log("📡 Analyzer started...");
+      elizaLogger.log("📡 Starting the analyzer...");
 
-      // check if the twitter config is valid - if not set your ENV variables correctly.
+      const db = new BetterSQLite3("data/db.sqlite");
+      const tokenMetricsProvider = new TokenMetricsProvider(db);
+      const cookieProvider = new CookieApiProvider(_runtime);
+
+      // Initialize the Twitter manager
       const twitterConfig: TwitterConfig = await validateTwitterConfig(
         _runtime
       );
-
-      // create a new twitter manager.
-      // the twitter manager can now
-      // be used to interact with the twitter api.
-      // we have some basic stuff like initializing the client
-      // and scrapint tweets from a list of accounts.
       const manager = new TwitterManager(_runtime, twitterConfig);
       await manager.client.init();
 
-      const cookieProvider = new CookieApiProvider(_runtime);
+      let selectedAgentAddress: string | null = null;
 
-      // API-Aufruf für die Top 10 Agents mit dem höchsten Mindshare
-      const agentsResponse = await cookieProvider.fetchAgentsPaged(
-        "_7Days",
-        1,
-        10
-      );
+      // 🔹 1️⃣ Check for active trades
+      const openTrades = tokenMetricsProvider.getActiveTrades();
+      elizaLogger.log(`📊 Found ${openTrades.length} active trades`);
 
-      if (!agentsResponse?.ok?.data || !Array.isArray(agentsResponse.ok.data)) {
-        throw new Error("Invalid response format from fetchAgentsPaged");
+      if (openTrades.length > 0) {
+        // ✅ If active trades exist, randomly select one
+        const trade =
+          openTrades.length > 1
+            ? openTrades[Math.floor(Math.random() * openTrades.length)]
+            : openTrades[0];
+
+        selectedAgentAddress = trade.tokenAddress;
+        elizaLogger.log("🎯 Selected trade:", selectedAgentAddress);
+      } else {
+        // ⚠️ No active trades found → Select a random agent from the API
+        elizaLogger.log(
+          "⚠️ No active trades found, selecting a random agent..."
+        );
+
+        const agentResponse = await cookieProvider.fetchAgentsPaged(
+          "_7Days",
+          1,
+          10
+        );
+
+        if (
+          !agentResponse.ok ||
+          !Array.isArray(agentResponse.ok.data) ||
+          agentResponse.ok.data.length === 0
+        ) {
+          elizaLogger.error("❌ No valid agent found!");
+          _callback({ text: "No agents found.", action: "DATA_ERROR" });
+          return false;
+        }
+
+        // ✅ Select a random agent from the fetched list
+        const randomAgent =
+          agentResponse.ok.data[
+            Math.floor(Math.random() * agentResponse.ok.data.length)
+          ];
+
+        // Extract contract address
+        selectedAgentAddress =
+          randomAgent.contracts[0]?.contractAddress ?? null;
+
+        if (!selectedAgentAddress) {
+          elizaLogger.error(
+            "❌ No valid contract address found for the agent!"
+          );
+          _callback({
+            text: "No valid agent contract found.",
+            action: "DATA_ERROR",
+          });
+          return false;
+        }
+
+        elizaLogger.log("🎯 Selected random agent:", selectedAgentAddress);
       }
 
-      // Extrahiere Twitter-Usernames & sortiere nach Mindshare (absteigend)
-      const topTwitterAccounts = agentsResponse.ok.data
-        .sort((a, b) => b.mindshare - a.mindshare) // Mindshare absteigend sortieren
-        .flatMap((agent) => agent.twitterUsernames) // Extrahiere alle Twitter-Usernames
-        .filter(Boolean) // Entferne leere Werte
-        .slice(0, 10); // Behalte nur die Top 10
+      // 🔹 2️⃣ Fetch top tweets for the selected agent or trade
+      elizaLogger.log("📡 Fetching top tweets for:", selectedAgentAddress);
 
-      console.log("📢 Top Twitter Accounts:", topTwitterAccounts);
+      const agentTweets = await cookieProvider.fetchAgentByContract(
+        selectedAgentAddress
+      );
 
-      // Setze die Top 10 Accounts in `putAccountsIntoChunks()`
-      manager.interaction.putAccountsIntoChunks(topTwitterAccounts);
+      if (
+        !agentTweets.ok ||
+        !agentTweets.ok.topTweets ||
+        agentTweets.ok.topTweets.length === 0
+      ) {
+        elizaLogger.error("❌ No tweets found for the selected agent.");
+        _callback({
+          text: "No tweets found for the agent.",
+          action: "DATA_ERROR",
+        });
+        return false;
+      }
 
-      // We put the tweets into chunks and collect the data
-      // from the twitter api.
-      // in the end a post is created with the data.
-      //   const summary = await manager.interaction.handleTwitterBatch();
+      // Extract tweet IDs from URLs
+      const tweetUrls = agentTweets.ok.topTweets.map((tweet) => tweet.tweetUrl);
+      const tweetIds = tweetUrls.map((url) => url.split("/status/")[1]);
 
-      //   const tweet = summary
-      //     ? await manager.interaction.createTweet(summary)
-      //     : null;
+      elizaLogger.log("📡 Extracted Tweet IDs:", tweetIds);
 
-      elizaLogger.log("📡 Analyzer finished...");
+      // 🔹 3️⃣ Fetch tweet contents
+      elizaLogger.log("📡 Fetching tweet contents...");
+      const tweetContents = await manager.interaction.fetchTweetsById(tweetIds);
 
-      //___________SCHREIBEN DER ERGEBNISSE IN DIE DATENBANK____________________________
+      if (!tweetContents || tweetContents.length === 0) {
+        elizaLogger.error("❌ No tweet contents found.");
+        _callback({ text: "No tweet contents found.", action: "DATA_ERROR" });
+        return false;
+      }
 
-      // const db = new BetterSQLite3("data/db.sqlite");
-      // // Provider instanziieren
-      // const tokenMetricsProvider = new TokenMetricsProvider(db);
-      // // Beispiel-Daten
-      // const exampleMetrics: TokenMetrics = {
-      //   tokenAddress: "0x1234567890abcdef",
-      //   symbol: "TEST",
-      //   mindshare: 85.5,
-      //   sentimentScore: 0.8,
-      //   liquidity: 1000000,
-      //   priceChange24h: 12.3,
-      //   holderDistribution: "Whale-Dominanz: 20%",
-      //   timestamp: new Date().toISOString(),
-      //   buySignal: true,
-      // };
-      // // Metriken speichern
-      // tokenMetricsProvider.upsertTokenMetrics(exampleMetrics);
-      // // Letzte Token-Metriken abrufen
-      // const latestMetrics = tokenMetricsProvider.getLatestTokenMetrics();
-      // console.log("📊 Letzte Token-Metriken:", latestMetrics);
+      elizaLogger.log(
+        "✅ Successfully fetched tweet contents:",
+        tweetContents.length
+      );
 
-      //____________________________________________________________________________________
+      // 🔹 4️⃣ Generate and post the tweet
+      elizaLogger.log("📡 Generating and posting the final tweet...");
+      await manager.interaction.generateAndPostTweet(
+        tweetContents,
+        _state.roomId
+      );
 
-      // Token-Metriken löschen
-      // tokenMetricsProvider.removeTokenMetrics("0x1234567890abcdef");
-
-      //TODO:
-      //Hier instanziieren wir den CookieFunApiProvider und führen
-      //eine Methode aus, die die Daten von Cookie.fun abruft
-      //danach rufen wir eine Funktion auf und Metriken zu berechnen.
-      //die finalen Metriken geben eine Kaufempfehlung zurück.
-      //Bei Kaufempfehlung schreiben wir die Daten in die Datenbank
-      //und kaufen den Token. (Dummy)
-
-      //const cookieApiProvider = new CookieApiProvider(...);
-      //cookieApiProvider.doSomething();
-      //...
-
-      // token wird gekauft wenn die analyse positiv ist und dann wird getwittert
-      // const twitterProvider = new TwitterProvider(...);
-      // twitterProvider.tweet("I just bought the token");
+      elizaLogger.log("✅ Successfully completed tweet posting!");
 
       _callback({
-        text: `🚀 Data sucessfully analyzed`,
+        text: `🚀 Data successfully analyzed and tweeted.`,
         action: "DATA_ANALYZED",
       });
 
       return true;
     } catch (error) {
       console.error("❌ Error analyzing:", error);
-      _callback({
-        text: "There was an error: .",
-        action: "DATA_ERROR",
-      });
-
+      _callback({ text: "There was an error.", action: "DATA_ERROR" });
       return false;
     }
   },
@@ -155,14 +186,27 @@ export const tweetMindshare: Action = {
       {
         user: "{{user1}}",
         content: {
-          text: "Can you query the data for me?",
+          text: "Can you analyze the latest trades and tweet about them?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "I am checking for trading signals, please wait.",
-          action: "ANALYZE_DATA",
+          text: "📡 Fetching the latest active trades... Please wait.",
+          action: "DATA_ANALYZED",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "✅ Found an open trade. Fetching relevant tweets...",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "🚀 Successfully posted a tweet with the latest trading insights!",
+          action: "POST_TWEET",
         },
       },
     ],
@@ -170,14 +214,33 @@ export const tweetMindshare: Action = {
       {
         user: "{{user2}}",
         content: {
-          text: "Get the latest trading signals from Cookie.fun",
+          text: "Check Cookie.fun and tweet about a trending project.",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Fetching data from Cookie.fun. This may take a moment.",
-          action: "ANALYZE_DATA",
+          text: "🔍 No open trades found. Selecting a random agent...",
+          action: "DATA_ANALYZED",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "🎯 Found a trending agent. Extracting top tweets...",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "✅ Generating a tweet summary with relevant market insights.",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "📢 Tweet posted successfully! Check it out on Twitter.",
+          action: "POST_TWEET",
         },
       },
     ],
@@ -185,13 +248,26 @@ export const tweetMindshare: Action = {
       {
         user: "{{user3}}",
         content: {
-          text: "Analyze the current market data for me.",
+          text: "Are there any tweets about my favorite project?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Starting data analysis... please hold on.",
+          text: "🤖 Searching for tweets related to the project...",
+          action: "SEARCH_TWEETS",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "✅ Found several recent tweets. Summarizing them...",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "🚀 Here’s a key insight: '$TOKEN is gaining momentum with a 25% increase in smart holders.'",
           action: "ANALYZE_DATA",
         },
       },
@@ -200,14 +276,27 @@ export const tweetMindshare: Action = {
       {
         user: "{{user4}}",
         content: {
-          text: "Do you have any buy signals?",
+          text: "Summarize and tweet about the latest DeFi trends.",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Let me analyze the data for potential buy signals. Please wait.",
-          action: "ANALYZE_DATA",
+          text: "📡 Fetching DeFi-related data from Cookie.fun...",
+          action: "FETCH_DATA",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "✅ Extracted top tweets from industry experts. Generating a tweet...",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "🔥 'DeFi TVL is up 18%! New protocols are reshaping the market. Stay ahead with these insights.'",
+          action: "POST_TWEET",
         },
       },
     ],
@@ -215,14 +304,27 @@ export const tweetMindshare: Action = {
       {
         user: "{{user5}}",
         content: {
-          text: "Check Cookie.fun for insights.",
+          text: "What’s trending in crypto today?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Querying Cookie.fun for trading insights now.",
-          action: "ANALYZE_DATA",
+          text: "📊 Analyzing trending tokens and top Twitter discussions...",
+          action: "FETCH_DATA",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "✅ Found a trending topic: '$TOKEN is making waves with record-breaking volume!'",
+        },
+      },
+      {
+        user: "{{eliza}}",
+        content: {
+          text: "🚀 Posting an update about the hottest market trends!",
+          action: "POST_TWEET",
         },
       },
     ],
