@@ -17,6 +17,10 @@ export const checkSell: Action = {
   similes: ["CHECK", "CHECK SELL", "CHECK PROFITS", "CHECK TRADES"],
   description: "Checks if any active trades should be sold",
 
+  validate: async (_runtime: IAgentRuntime, _message: Memory) => {
+    return true;
+  },
+
   handler: async (
     runtime: IAgentRuntime,
     _message: Memory,
