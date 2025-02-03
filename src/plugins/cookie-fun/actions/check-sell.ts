@@ -30,7 +30,7 @@ export const checkSell: Action = {
   ): Promise<boolean> => {
     try {
       //-------------------------------Stellschrauben--------------------------------
-      const alwaysFlagsForSell = true; // Flags all active trades for sell
+      const alwaysFlagsForSell = false; // Flags all active trades for sell
       const printDexScreenerResponse = false; // Prints the DexScreener response (duh)
       //-------------------------------Stellschrauben--------------------------------
       
@@ -42,6 +42,7 @@ export const checkSell: Action = {
       elizaLogger.log(`📊 Checking ${activeTrades.length} active trades for sellconditions`);
 
       let markedForSelling = 0;
+      let totalPnL = 0;
       for (const trade of activeTrades) {
         try {
           const dexData = await dexscreenerProvider.fetchTokenPrice(trade.tokenAddress);
@@ -82,6 +83,8 @@ export const checkSell: Action = {
             };
             tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           }
+
+          totalPnL += profitLossPercent;
         } catch (error) {
           elizaLogger.error(`Error checking sell for ${trade.symbol}:`, error);
         }
@@ -91,8 +94,8 @@ export const checkSell: Action = {
       
       if (callback) {
         callback({
-          text: `Checked ${activeTrades.length} trades, marked ${markedForSelling} for selling`,
-          action: "CHECK_COMPLETE"
+          text: `💰 Trade check complete | ${activeTrades.length} active trades monitored | ${markedForSelling} sell signals | Average P/L: ${(totalPnL / activeTrades.length || 0)}%`,
+          action: "CHECK_SELL_COMPLETE"
         });
       }
 

@@ -131,14 +131,21 @@ export const sellToken: Action = {
         [Chain.AVALANCHE]: 'https://snowtrace.io/tx/'
       };
 
-      _callback({
-        text: `Successfully sold ${tradeResult.symbol} for ${ethers.formatEther(balance)} tokens at price ${exitPrice} (${profitLossPercent > 0 ? '+' : ''}${profitLossPercent}%)\nTransaction: ${explorerUrls[selectedChain]}${tradeResult.tradeId}`.replace(/\n/g, ' '),
-        action: "TOKEN_SOLD",
-        data: {
-          ...tradeResult,
-          profitLossPercent
-        }
-      });
+      if (tradeResult) {
+        _callback({
+          text: `📝 Token queued for selling | Token: ${tradeResult.symbol} | Chain: ${ACTIVE_CHAIN} | Status: Ready to execute on next cycle`,
+          action: "SELL_TOKEN_QUEUED",
+          data: {
+            ...tradeResult,
+            chain: ACTIVE_CHAIN
+          }
+        });
+      } else {
+        _callback({
+          text: `❌ Failed to queue token for selling: Trade execution failed`,
+          action: "SELL_TOKEN_ERROR"
+        });
+      }
 
       return true;
     } catch (error) {
@@ -151,7 +158,6 @@ export const sellToken: Action = {
         text: `Failed to sell token: ${error.message}`,
         action: "SELL_ERROR",
       });
-
       return false;
     }
   },

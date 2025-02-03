@@ -20,14 +20,27 @@ import { getChainId } from '../utils/chain-utils.ts';
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
-  similes: ["ANALYZE", "GET COOKIE DATA", "DATA ANALYZE"],
+  similes: [
+//    "ANALYZE THE DATA",
+    "ANALYZE DATA",
+//    "RUN ANALYSIS",
+//  "MARKET ANALYSIS",
+ //   "SCAN MARKET",
+ //   "CHECK MARKET"
+  ],
   description: "Analyzes market data and sets buy signals in database",
 
   validate: async (_runtime: IAgentRuntime, _message: Memory) => {
     return true;
   },
 
-  handler: async (runtime: IAgentRuntime): Promise<boolean> => {
+  handler: async (
+    runtime: IAgentRuntime,
+    _message: Memory,
+    _state: State,
+    _options: { [key: string]: unknown },
+    callback?: HandlerCallback
+  ): Promise<boolean> => {
     try {
       elizaLogger.log("📊 Starting market analysis...");
 
@@ -121,6 +134,14 @@ export const analyzeData: Action = {
         if (metrics.buySignal) {
           elizaLogger.log(`🎯 Buy signal detected for ${metrics.symbol}`);
         }
+      }
+
+      if (callback) {
+        const buySignals = tokenMetricsProvider.getTokensToBuy().length;
+        callback({
+          text: `📊 Analysis complete | Found ${buySignals} potential buy opportunities | Mindshare and sentiment analyzed | Liquidity verified`,
+          action: "ANALYZE_DATA_COMPLETE"
+        });
       }
 
       elizaLogger.log("✅ Market analysis completed");

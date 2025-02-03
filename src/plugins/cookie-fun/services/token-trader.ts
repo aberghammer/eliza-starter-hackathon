@@ -49,7 +49,14 @@ export class TokenTrader {
     }
   }
 
-  async processPendingBuys(runtime: IAgentRuntime): Promise<boolean> {
+  public async processPendingBuys(runtime: IAgentRuntime): Promise<{
+    success: boolean;
+    symbol?: string;
+    tokensReceived?: string;
+    price?: string;
+    tradeId?: string;
+    error?: string;
+  }> {
     try {
       const tokensToBuy = this.tokenMetricsProvider.getTokensToBuy();
       elizaLogger.log(`Found ${tokensToBuy.length} tokens with buy signals`);
@@ -72,20 +79,38 @@ export class TokenTrader {
           const updatedMetrics = {
             ...token,
             buySignal: false,        // Reset buy flag
-            entryPrice: result.price, // Set entry price
+            entryPrice: result.price, // Already a number, no need to parse
             timestamp: new Date().toISOString()
           };
 
           this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           elizaLogger.log(`✅ Bought ${result.symbol} at ${result.price}`);
+
+          return {
+            success: true,
+            symbol: result.symbol,
+            tokensReceived: result.tokensReceived,
+            price: result.price.toString(),
+            tradeId: result.tradeId
+          };
         } catch (error) {
           elizaLogger.error(`❌ Error buying ${token.symbol}:`, error);
         }
       }
-      return true;
+      return {
+        success: true,
+        symbol: undefined,
+        tokensReceived: undefined,
+        price: undefined,
+        tradeId: undefined,
+        error: undefined
+      };
     } catch (error) {
       elizaLogger.error("❌ Error processing pending buys:", error);
-      return false;
+      return {
+        success: false,
+        error: error.message
+      };
     }
   }
 

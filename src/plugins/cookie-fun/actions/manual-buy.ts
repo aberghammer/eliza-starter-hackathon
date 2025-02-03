@@ -13,6 +13,8 @@ import { TRADE_AMOUNT } from "../config.ts";
 import { getChainId } from '../utils/chain-utils.ts';
 import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
+import { TokenTrader } from "../services/token-trader.ts";
+import { ACTIVE_CHAIN } from "../config.ts";
 
 export const manualBuy: Action = {
   name: "MANUAL_BUY",
@@ -24,69 +26,48 @@ export const manualBuy: Action = {
   },
 
   handler: async (
-    _runtime: IAgentRuntime,
+    runtime: IAgentRuntime,
     _message: Memory,
     _state: State,
     _options: { [key: string]: unknown },
-    _callback: HandlerCallback
+    callback?: HandlerCallback
   ): Promise<boolean> => {
     try {
       const content = _message.content as any;
-      const tokenAddress = content.tokenAddress;
-      const chainName = content.chain || 'arbitrum';
+      const tokenAddress = content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
+      const chainName = content.chain || ACTIVE_CHAIN;
       const amount = content.amount || TRADE_AMOUNT;
 
-      if (!tokenAddress) {
-        throw new Error("Token address is required");
-      }
-
-      const tradeExecutor = new TradeExecutionProvider(chainName, _runtime);
-      const amountInWei = ethers.parseEther(amount);
-      
-      const tradeResult = await tradeExecutor.buyToken(
+      const trader = new TokenTrader();
+      const result = await trader.manualBuy({
         tokenAddress,
-        amountInWei.toString()
-      );
-
-      if (!tradeResult) {
-        throw new Error("Trade execution failed");
-      }
-
-      // Save to database
-      const db = new BetterSQLite3("data/db.sqlite");
-      const tokenMetricsProvider = new TokenMetricsProvider(db);
-
-      const metrics = {
-        tokenAddress,
-        chainId: getChainId(chainName),
         chainName,
-        symbol: tradeResult.symbol,
-        mindshare: 0,
-        sentimentScore: 0,
-        liquidity: 0,
-        priceChange24h: 0,
-        holderDistribution: "",
-        timestamp: new Date().toISOString(),
-        buySignal: false,
-        entryPrice: tradeResult.price,
-        finalized: false
-      };
-
-      tokenMetricsProvider.upsertTokenMetrics(metrics);
-
-      _callback({
-        text: `Successfully bought ${tradeResult.symbol} for ${amount} on ${chainName}`,
-        action: "TOKEN_BOUGHT",
-        data: tradeResult
+        amount,
+        runtime,
+        callback
       });
 
-      return true;
+      if (callback) {
+        callback({
+          text: `🛍️ Manual buy executed | Token: ${result.symbol} (${tokenAddress}) | Amount: ${amount} ETH | Price: ${result.price} | Chain: ${chainName} | TX: ${result.tradeId}`,
+          action: "MANUAL_BUY_COMPLETE",
+          data: {
+            ...result,
+            chainName,
+            amount
+          }
+        });
+      }
+
+      return result.success;
     } catch (error) {
       elizaLogger.error("❌ Error in manual buy:", error);
-      _callback({
-        text: `Failed to buy token: ${error.message}`,
-        action: "BUY_ERROR",
-      });
+      if (callback) {
+        callback({
+          text: `Failed to buy token: ${error.message}`,
+          action: "BUY_ERROR",
+        });
+      }
       return false;
     }
   },

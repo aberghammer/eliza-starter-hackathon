@@ -21,6 +21,7 @@ export interface TradeResult {
   symbol: string;
   price: number;
   tradeId: string;
+  tokensReceived?: string;
   profitLossPercent: number;
   tokensSpent: number;
   ethReceived: number;

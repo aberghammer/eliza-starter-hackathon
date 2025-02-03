@@ -44,6 +44,18 @@ export const manualSell: Action = {
         callback: _callback
       });
 
+      if (result.success) {
+        _callback({
+          text: `💰 Manual sell executed | Token: ${result.symbol} (${tokenAddress}) | Amount: ${result.tokensSpent} | Price: ${result.price} | Chain: ${chainName} | P/L: ${result.profitLossPercent}% | TX: ${result.tradeId}`,
+          action: "MANUAL_SELL_COMPLETE",
+          data: {
+            ...result,
+            chainName,
+            tokenAddress
+          }
+        });
+      }
+
       return result.success;
     } catch (error) {
       elizaLogger.error("❌ Error in sell action:", error);

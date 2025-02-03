@@ -105,7 +105,7 @@ async function startAgent(character: Character, directClient: DirectClient) {
     elizaLogger.debug(`Started ${character.name} as ${runtime.agentId}`);
 
     // Start housekeeping for this agent
-    await setupHousekeeping(runtime);
+    //await setupHousekeeping(runtime);
 
     return runtime;
   } catch (error) {
@@ -120,7 +120,6 @@ async function setupHousekeeping(runtime: IAgentRuntime) {
     try {
       const content: Content = {
         text: "Running periodic housekeeping",
-        action: "HOUSEKEEPING",
         source: "system",
         attachments: []
       };
