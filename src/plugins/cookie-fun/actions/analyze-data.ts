@@ -17,7 +17,8 @@ import {
 
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider";
+import { ACTIVE_CHAIN } from '../config';
+import { getChainId } from '../utils/chain-utils';
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -77,14 +78,17 @@ export const analyzeData: Action = {
       tokenAddress = hardcodedTokenToBuy || tokenAddress; //Takes hardcodedTokenToBuy if its filled, otherwise just uses the tokenaddress given by the agent
       const tokenMetrics: TokenMetrics = {
         tokenAddress,
-        symbol: agent.agentName.toUpperCase(), // Symbol aus AgentName ableiten
-        mindshare: agent.mindshare || 0,
-        sentimentScore: agent.mindshareDeltaPercent || 0, // Hier könnte eine bessere Sentiment-Berechnung erfolgen
-        liquidity: agent.liquidity || 0,
-        priceChange24h: agent.priceDeltaPercent || 0,
-        holderDistribution: `Holders: ${agent.holdersCount} (Change: ${agent.holdersCountDeltaPercent}%)`,
+        chainId: getChainId(ACTIVE_CHAIN),
+        chainName: ACTIVE_CHAIN,
+        symbol: agent.agentName.toUpperCase(),
+        mindshare: 0,
+        sentimentScore: 0,
+        liquidity: 0,
+        priceChange24h: 0,
+        holderDistribution: "",
         timestamp: new Date().toISOString(),
-        buySignal: true,  // agent.mindshareDeltaPercent > 10 // Einfacher Logik-Check, ob Mindshare stark gestiegen ist
+        buySignal: true,
+        finalized: false
       };
 
       let buyPrice = 0;

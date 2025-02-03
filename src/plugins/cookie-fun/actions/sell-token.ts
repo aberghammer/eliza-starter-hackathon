@@ -13,6 +13,7 @@ import BetterSQLite3 from "better-sqlite3";
 import { ethers } from "ethers";
 import { Chain } from '../types/Chain';
 import { ACTIVE_CHAIN } from '../config';
+import { stringToChain } from '../utils/chain-utils';
 
 export const sellToken: Action = {
   name: "SELL_TOKEN",
@@ -89,7 +90,7 @@ export const sellToken: Action = {
       elizaLogger.log(`🔄 Starting token sale for ${tokenAddress} with balance ${balance}`);
 
       const tradeExecutor = new TradeExecutionProvider(
-        selectedChain,
+        stringToChain(selectedChain),
         _runtime
       );
 
@@ -174,4 +175,87 @@ export const sellToken: Action = {
       },
     ],
   ] as ActionExample[][],
-} as Action; 
+} as Action;
+
+export class SellTokenAction {
+  private tokenMetricsProvider: TokenMetricsProvider;
+  private db: BetterSQLite3.Database;
+
+  constructor() {
+    this.db = new BetterSQLite3("data/db.sqlite");
+    this.tokenMetricsProvider = new TokenMetricsProvider(this.db);
+  }
+
+  async executeSell(runtime: IAgentRuntime) {
+    try {
+      // Get tokens marked for selling
+      const tokensToSell = this.tokenMetricsProvider.getTokensToSell();
+      
+      for (const token of tokensToSell) {
+        try {
+          // Initialize trade executor for this chain
+          const tradeExecutor = new TradeExecutionProvider(
+            stringToChain(token.chainName),
+            runtime
+          );
+
+          // Get token balance
+          const provider = new ethers.JsonRpcProvider(
+            runtime.getSetting(`${token.chainName.toUpperCase()}_RPC_URL`)
+          );
+          const wallet = new ethers.Wallet(
+            runtime.getSetting(`${token.chainName.toUpperCase()}_WALLET_PRIVATE_KEY`),
+            provider
+          );
+          
+          const tokenContract = new ethers.Contract(
+            token.tokenAddress,
+            ["function balanceOf(address) view returns (uint256)"],
+            provider
+          );
+          
+          const balance = await tokenContract.balanceOf(wallet.address);
+
+          if (balance === BigInt(0)) {
+            elizaLogger.error(`No balance to sell for ${token.symbol}`);
+            continue;
+          }
+
+          // Execute the sell
+          const tradeResult = await tradeExecutor.sellToken(
+            token.tokenAddress,
+            balance.toString()
+          );
+
+          if (!tradeResult) {
+            elizaLogger.error(`Failed to sell ${token.symbol}`);
+            continue;
+          }
+
+          // Calculate profit/loss
+          const profitLossPercent = Math.round(
+            ((tradeResult.price - token.entryPrice!) / token.entryPrice!) * 100
+          );
+
+          // Finalize the trade in database
+          this.tokenMetricsProvider.finalizeTrade(
+            token.tokenAddress,
+            token.chainId,
+            tradeResult.price,
+            profitLossPercent
+          );
+
+          elizaLogger.log(`✅ Sold ${token.symbol} at ${profitLossPercent}% ${profitLossPercent >= 0 ? 'profit' : 'loss'}`);
+
+        } catch (error) {
+          elizaLogger.error(`❌ Error selling ${token.symbol}:`, error);
+        }
+      }
+
+      return true;
+    } catch (error) {
+      elizaLogger.error("❌ Error in sell execution:", error);
+      return false;
+    }
+  }
+} 
