@@ -1,18 +1,14 @@
-import { 
-  elizaLogger, 
-  type Action, 
+import {
+  elizaLogger,
+  type Action,
   type ActionExample,
-  type IAgentRuntime, 
+  type IAgentRuntime,
   type Memory,
   type State,
-  type HandlerCallback 
+  type HandlerCallback,
 } from "@elizaos/core";
-import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
 import { TRADE_AMOUNT } from "../config.ts";
-import { getChainId } from '../utils/chain-utils.ts';
-import BetterSQLite3 from "better-sqlite3";
-import { ethers } from "ethers";
+
 import { TokenTrader } from "../services/token-trader.ts";
 import { ACTIVE_CHAIN } from "../config.ts";
 
@@ -26,7 +22,7 @@ export const manualBuy: Action = {
   },
 
   handler: async (
-    runtime: IAgentRuntime,
+    _runtime: IAgentRuntime,
     _message: Memory,
     _state: State,
     _options: { [key: string]: unknown },
@@ -34,17 +30,21 @@ export const manualBuy: Action = {
   ): Promise<boolean> => {
     try {
       const content = _message.content as any;
-      const tokenAddress = content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
+      const tokenAddress =
+        content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
       const chainName = content.chain || ACTIVE_CHAIN;
-      const amount = content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount || TRADE_AMOUNT;
+      const amount =
+        content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] ||
+        content.amount ||
+        TRADE_AMOUNT;
 
-      const trader = new TokenTrader();
+      const trader = new TokenTrader(_runtime);
       const result = await trader.manualBuy({
         tokenAddress,
         chainName,
         amount,
-        runtime,
-        callback
+        runtime: _runtime,
+        callback,
       });
 
       if (callback) {
@@ -54,8 +54,8 @@ export const manualBuy: Action = {
           data: {
             ...result,
             chainName,
-            amount
-          }
+            amount,
+          },
         });
       }
 
@@ -80,7 +80,7 @@ export const manualBuy: Action = {
           text: "Buy this token",
           tokenAddress: "0x1234...",
           chain: "arbitrum",
-          amount: "0.1"
+          amount: "0.1",
         },
       },
       {

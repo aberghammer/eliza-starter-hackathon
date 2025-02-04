@@ -1,16 +1,17 @@
-import { 
-  elizaLogger, 
-  type Action, 
-  type IAgentRuntime, 
+import {
+  elizaLogger,
+  type Action,
+  type IAgentRuntime,
   type Memory,
   type State,
   type HandlerCallback,
-  type ActionExample
+  type ActionExample,
 } from "@elizaos/core";
-import { TokenMetricsProvider } from "../providers/token-metrics-provider.ts";
+
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 import { PROFIT_TARGET, STOP_LOSS } from "../config.ts";
-import BetterSQLite3 from "better-sqlite3";
+
+import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
 
 export const checkSell: Action = {
   name: "CHECK_SELL",
@@ -33,36 +34,45 @@ export const checkSell: Action = {
       const alwaysFlagsForSell = false; // Flags all active trades for sell
       const printDexScreenerResponse = false; // Prints the DexScreener response (duh)
       //-------------------------------Stellschrauben--------------------------------
-      
-      const db = new BetterSQLite3("data/db.sqlite");
-      const tokenMetricsProvider = new TokenMetricsProvider(db);
+
       const dexscreenerProvider = new DexscreenerProvider();
 
-      const activeTrades = tokenMetricsProvider.getActiveTrades();
-      elizaLogger.log(`📊 Checking ${activeTrades.length} active trades for sellconditions`);
+      const tokenMetricsProvider = new TokenMetricsProvider(
+        runtime.getSetting("DB_CONNECTION_STRING")
+      );
+
+      const activeTrades = await tokenMetricsProvider.getActiveTrades();
+      elizaLogger.log(
+        `📊 Checking ${activeTrades.length} active trades for sellconditions`
+      );
 
       let markedForSelling = 0;
       let totalPnL = 0;
       for (const trade of activeTrades) {
         try {
-          const dexData = await dexscreenerProvider.fetchTokenPrice(trade.tokenAddress);
-          if(printDexScreenerResponse){
-            elizaLogger.log("DexScreener response:", dexData); 
+          const dexData = await dexscreenerProvider.fetchTokenPrice(
+            trade.token_address
+          );
+          if (printDexScreenerResponse) {
+            elizaLogger.log("DexScreener response:", dexData);
           }
-     
-          
+
           // Find the WETH pair
-          const wethPair = dexData.pairs?.find(p => p.quoteToken.symbol === "WETH");
-          const currentPriceInEth = wethPair?.priceNative ? parseFloat(wethPair.priceNative) : null;
-          const entryPrice = trade.entryPrice;
-          const symbol = wethPair?.baseToken?.symbol || trade.symbol;  // Use trade.symbol as fallback
+          const wethPair = dexData.pairs?.find(
+            (p) => p.quoteToken.symbol === "WETH"
+          );
+          const currentPriceInEth = wethPair?.priceNative
+            ? parseFloat(wethPair.priceNative)
+            : null;
+          const entryPrice = trade.entry_price;
+          const symbol = wethPair?.baseToken?.symbol || trade.symbol; // Use trade.symbol as fallback
 
           elizaLogger.log(`Debug values for ${symbol}:`, {
             currentPriceInEth,
             entryPrice,
             hasCurrentPrice: !!currentPriceInEth,
             hasEntryPrice: !!entryPrice,
-            pairFound: !!wethPair
+            pairFound: !!wethPair,
           });
 
           if (!entryPrice || !currentPriceInEth) {
@@ -70,16 +80,23 @@ export const checkSell: Action = {
             continue;
           }
 
-          const profitLossPercent = ((currentPriceInEth - entryPrice) / entryPrice) * 100;
+          const profitLossPercent =
+            ((currentPriceInEth - entryPrice) / entryPrice) * 100;
 
-          if (profitLossPercent >= PROFIT_TARGET || profitLossPercent <= STOP_LOSS || alwaysFlagsForSell) {
-            elizaLogger.log(`�� Sell signal for ${symbol}: P/L = ${profitLossPercent}%`);
+          if (
+            profitLossPercent >= PROFIT_TARGET ||
+            profitLossPercent <= STOP_LOSS ||
+            alwaysFlagsForSell
+          ) {
+            elizaLogger.log(
+              `�� Sell signal for ${symbol}: P/L = ${profitLossPercent}%`
+            );
             markedForSelling++;
-            
+
             const updatedMetrics = {
               ...trade,
               sellSignal: true,
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
             };
             tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           }
@@ -90,12 +107,18 @@ export const checkSell: Action = {
         }
       }
 
-      elizaLogger.log(`✅ Sell check completed. Flagged ${markedForSelling} of ${activeTrades.length} trades for selling`);
-      
+      elizaLogger.log(
+        `✅ Sell check completed. Flagged ${markedForSelling} of ${activeTrades.length} trades for selling`
+      );
+
       if (callback) {
         callback({
-          text: `💰 Trade check complete | ${activeTrades.length} active trades monitored | ${markedForSelling} sell signals | Average P/L: ${(totalPnL / activeTrades.length || 0)}%`,
-          action: "CHECK_SELL_COMPLETE"
+          text: `💰 Trade check complete | ${
+            activeTrades.length
+          } active trades monitored | ${markedForSelling} sell signals | Average P/L: ${
+            totalPnL / activeTrades.length || 0
+          }%`,
+          action: "CHECK_SELL_COMPLETE",
         });
       }
 
@@ -105,7 +128,7 @@ export const checkSell: Action = {
       if (callback) {
         callback({
           text: `Failed to check trades: ${error.message}`,
-          action: "CHECK_ERROR"
+          action: "CHECK_ERROR",
         });
       }
       return false;
@@ -157,6 +180,6 @@ export const checkSell: Action = {
           action: "CHECK_SELL",
         },
       },
-    ]
+    ],
   ] as ActionExample[][],
 } as Action;
