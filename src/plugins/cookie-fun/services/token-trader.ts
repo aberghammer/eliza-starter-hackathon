@@ -95,10 +95,12 @@ export class TokenTrader {
           // Update only what changed after buying
           const updatedMetrics = {
             ...token,
-            buySignal: false, // Reset buy flag
-            entryPrice: result.price, // Already a number, no need to parse
+            buy_signal: false, // Reset buy flag
+            entry_price: result.price, // Already a number, no need to parse
             timestamp: new Date().toISOString(),
           };
+
+          elizaLogger.log(`Updated metrics: ${JSON.stringify(updatedMetrics)}`);
 
           this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           elizaLogger.log(`✅ Bought ${result.symbol} at ${result.price}`);
