@@ -59,10 +59,6 @@ export const analyzeData: Action = {
         runtime.getSetting("DB_CONNECTION_STRING")
       );
 
-      elizaLogger.log("------------------------------------------");
-      elizaLogger.log(runtime.getSetting("DB_CONNECTION_STRING"));
-      elizaLogger.log("------------------------------------------");
-
       const dexscreener = new DexscreenerProvider();
 
       if (cleanDatabase) {
