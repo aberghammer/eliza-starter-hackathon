@@ -7,6 +7,7 @@ import { manualSell } from "./actions/manual-sell.ts";
 import { housekeeping } from "./actions/housekeeping.ts";
 import type { Plugin } from "@elizaos/core";
 import { analyzeData } from "./actions/analyze-data.ts";
+import { tweetMindshare } from "./actions/tweet-mindshare.ts";
 
 export default {
   name: "cookie-fun",
@@ -21,5 +22,6 @@ export default {
     manualBuy,
     manualSell,
     housekeeping,
+    tweetMindshare,
   ],
 } as Plugin;
