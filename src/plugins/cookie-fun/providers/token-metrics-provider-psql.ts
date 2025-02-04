@@ -34,10 +34,13 @@ export class TokenMetricsProvider {
         entry_price REAL,
         exit_price REAL,
         profit_loss REAL,
-        finalized BOOLEAN DEFAULT FALSE,
-        UNIQUE (token_address, chain_id, timestamp)
+        finalized BOOLEAN DEFAULT FALSE
       );
+      CREATE UNIQUE INDEX IF NOT EXISTS unique_open_trade 
+      ON token_metrics (token_address, chain_id) 
+      WHERE finalized = FALSE;
     `;
+
     await this.db.query(query);
   }
 
@@ -96,7 +99,11 @@ export class TokenMetricsProvider {
         liquidity, price_change24h, holder_distribution, timestamp, 
         buy_signal, sell_signal, entry_price, exit_price, profit_loss, finalized
       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
-      ON CONFLICT (token_address, chain_id, timestamp) DO UPDATE SET
+      
+      -- 🚀 Wichtiger Fix: Wir referenzieren die Spalten direkt und nicht den Indexnamen!
+      ON CONFLICT (token_address, chain_id)
+      WHERE finalized = FALSE
+      DO UPDATE SET
         chain_name = EXCLUDED.chain_name,
         symbol = EXCLUDED.symbol,
         mindshare = EXCLUDED.mindshare,
