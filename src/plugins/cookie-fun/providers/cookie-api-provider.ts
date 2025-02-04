@@ -107,7 +107,7 @@ export class CookieApiProvider {
       }
 
       const data = await response.json();
-      elizaLogger.log("✅ Successfully fetched Cookie API data:", data);
+      elizaLogger.log("✅ Successfully fetched Cookie API data.");
       return data;
     } catch (error) {
       elizaLogger.error("❌ Error fetching Cookie API data:", error);

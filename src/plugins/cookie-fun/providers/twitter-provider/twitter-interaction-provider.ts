@@ -16,6 +16,7 @@ import {
 } from "@elizaos/core";
 import { ClientBase } from "./twitter-base-provider";
 import { SearchMode, Tweet } from "agent-twitter-client";
+import { CookieTweet } from "../../types/TwitterTypes";
 
 const SCRAPE_BATCH_SIZE = 10;
 
@@ -70,6 +71,126 @@ export class TwitterInteractionClient {
     }
 
     return allValidTweets;
+  }
+
+  public async analyzeSentiment(searchterm: string, tweets: CookieTweet[]) {
+    try {
+      if (!tweets || tweets.length === 0) {
+        throw new Error("❌ No tweets provided for sentiment analysis.");
+      }
+
+      // Vorbereiten einer Connection und State
+      const roomId = stringToUuid(this.runtime.agentId);
+      // Tweets formattieren
+      const formattedTweets = tweets
+        .map(
+          (tweet, index) => `📝 Tweet #${index + 1}
+      📅 Datum: ${tweet.createdAt}
+      👤 Autor: ${tweet.authorUsername}
+      🔹 Likes: ${tweet.likesCount}, Retweets: ${
+            tweet.retweetsCount
+          }, Replies: ${tweet.repliesCount}
+      🔹 Impressions: ${tweet.impressionsCount}, Engagements: ${
+            tweet.engagementsCount
+          }
+      🔹 Matching Score: ${tweet.matchingScore}
+      🗣 Text: "${tweet.text}"
+      ------------------------------------------------`
+        )
+        .join("\n\n");
+
+      elizaLogger.log(
+        "🔍 Formatted Tweets for Sentiment Analysis:",
+        formattedTweets
+      );
+
+      // Zustand für das LLM vorbereiten
+      const state = await this.runtime.composeState({
+        userId: this.runtime.agentId,
+        roomId: roomId,
+        agentId: this.runtime.agentId,
+        content: { text: formattedTweets },
+      });
+
+      // Kontext für die Sentiment-Analyse erstellen
+      const buySignalContext = composeContext({
+        state,
+        template: `
+         Here are some recent tweets:
+         ${formattedTweets}
+          
+         Task:
+         - Analyze the most relevant topics from the tweets.
+         - Check the sentiment regarding ${searchterm}. 
+         - Check if the tweets suggest a buy signal for ${searchterm} or not.
+  
+         Respond only with buy or no buy based on the sentiment analysis no other text is needed. This is a strict requirement.
+        `,
+      });
+
+      // Sentiment-Analyse mit LLM durchführen
+      const shouldBuy = await generateText({
+        runtime: this.runtime,
+        context: buySignalContext,
+        modelClass: ModelClass.SMALL, // Upgrade to MEDIUM/LARGE if needed
+      });
+
+      elizaLogger.log(
+        `📊 Sentiment Analysis Result for ${searchterm}:`,
+        shouldBuy
+      );
+
+      // Kontext für Tweet-Generierung
+      const context = composeContext({
+        state,
+        template: `
+          Here are some recent tweets:
+          ${formattedTweets}
+  
+          We already analyzed the sentiment regarding ${searchterm}.
+          We found, that we should ${shouldBuy} ${searchterm}.
+          
+          Task:
+          - Analyze the most relevant topics from the tweets.
+          - Create a short and engaging Twitter post.
+          - The tweet must be **186 characters or less** (strict limit).
+          - Keep it concise, impactful, and aligned with crypto trends.
+          - Avoid generic statements—provide insights or a bold statement.
+          - Add why we currently ${shouldBuy} ${searchterm} in the tweet.
+          - **Do NOT add quotation marks or any extra formatting around the tweet.** Just return the text.
+          
+          Example format:
+          🔥 $TOKEN just hit a new high! 🚀 On-chain data shows a 35% volume spike. Totally a buy in here! #Crypto #DeFi
+      
+          Respond with only the tweet text, nothing else.
+        `,
+      });
+
+      // Tweet generieren
+      const summary = await generateText({
+        runtime: this.runtime,
+        context,
+        modelClass: ModelClass.SMALL, // Upgrade to MEDIUM/LARGE if needed
+      });
+
+      elizaLogger.log("📢 Generated Tweet:", summary);
+
+      if (!summary || summary.length === 0) {
+        throw new Error("❌ No tweet generated, aborting.");
+      }
+
+      // **Tweet posten**
+      await this.postTweet(summary);
+      elizaLogger.log("✅ Tweet successfully posted!");
+
+      return shouldBuy === "buy";
+    } catch (error) {
+      elizaLogger.error("❌ Error in analyzeSentiment:", {
+        message: error.message,
+        stack: error.stack,
+      });
+      return false;
+    }
   }
 
   /**
@@ -203,13 +324,17 @@ export class TwitterInteractionClient {
 
       const body = await response.json();
 
-      if (!body?.data?.id) {
+      const tweetId = body?.data?.create_tweet?.tweet_results?.result?.rest_id;
+
+      if (!tweetId) {
         elizaLogger.error(
           "❌ Fehler beim Tweet-Posten, keine ID zurückgegeben:",
           body
         );
         return;
       }
+
+      elizaLogger.log(`✅ Tweet erfolgreich gepostet! ID: ${tweetId}`);
 
       elizaLogger.log("✅ Tweet erfolgreich gepostet:", body);
       return body;

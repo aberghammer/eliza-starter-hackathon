@@ -16,6 +16,11 @@ import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 import { ACTIVE_CHAIN } from "../config.ts";
 import { getChainId } from "../utils/chain-utils.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
+import {
+  TwitterConfig,
+  TwitterManager,
+  validateTwitterConfig,
+} from "../providers/index.ts";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -45,6 +50,8 @@ export const analyzeData: Action = {
 
       //-------------------------------Stellschrauben--------------------------------
       const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; // Forces analysis of a specific token
+      // const hardcodedTokenToBuy = ""; // Forces analysis of a specific token
+
       const cleanDatabase = false; // Cleans all entries in the database
       //-------------------------------Stellschrauben--------------------------------
 
@@ -55,7 +62,7 @@ export const analyzeData: Action = {
       elizaLogger.log("------------------------------------------");
       elizaLogger.log(runtime.getSetting("DB_CONNECTION_STRING"));
       elizaLogger.log("------------------------------------------");
-      const cookieProvider = new CookieApiProvider(runtime);
+
       const dexscreener = new DexscreenerProvider();
 
       if (cleanDatabase) {
@@ -95,53 +102,57 @@ export const analyzeData: Action = {
           `🎯 Buy signal set for hardcoded token ${hardcodedTokenToBuy}`
         );
       } else {
-        // Get data from Cookie API
-        const response = await cookieProvider.fetchAgentByTwitter(
-          "aixbt_agent"
-        );
+        const tokensWithBuySignal = await tokenMetricsProvider.getTokensToBuy();
 
-        if (!response?.ok) {
-          throw new Error("Invalid API response");
-        }
+        if (tokensWithBuySignal.length > 0) {
+          for (const token of tokensWithBuySignal) {
+            const dexData = await dexscreener.fetchTokenPrice(
+              token.token_address
+            );
 
-        const agent = response.ok;
+            const cookieProvider = new CookieApiProvider(runtime);
+            const twitterConfig: TwitterConfig = await validateTwitterConfig(
+              runtime
+            );
+            const manager = new TwitterManager(runtime, twitterConfig);
+            await manager.client.init();
+            // Get data from Cookie API
 
-        // Extract token data (take first contract token)
-        let tokenAddress =
-          agent.contracts.length > 0
-            ? agent.contracts[0].contractAddress
-            : "UNKNOWN";
+            const today = new Date().toISOString().split("T")[0];
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const formattedYesterday = yesterday.toISOString().split("T")[0];
 
-        if (tokenAddress === "UNKNOWN") {
-          throw new Error("No valid token address found");
-        }
+            elizaLogger.log("Token properties:", token);
 
-        // Get additional data from Dexscreener
-        const dexData = await dexscreener.fetchTokenPrice(tokenAddress);
+            const data = await cookieProvider.searchTweets(
+              token.symbol,
+              formattedYesterday,
+              today
+            );
 
-        const metrics: TokenMetrics = {
-          token_address: tokenAddress,
-          chain_id: getChainId(ACTIVE_CHAIN),
-          chain_name: ACTIVE_CHAIN,
-          symbol: agent.agentName.toUpperCase(),
-          mindshare: agent.mindshare || 0,
-          sentiment_score: agent.sentiment || 0,
-          liquidity: dexData.liquidity || 0,
-          price_change24h: dexData.price_change24h || 0,
-          holder_distribution: "",
-          timestamp: new Date().toISOString(),
-          buy_signal: analyzeBuySignal(agent, dexData),
-          // sell_signal: false,
-          // entry_price: null,
-          // exit_price: null,
-          // profit_loss: null,
-          finalized: false,
-        };
+            const tweets = data.ok;
+            if (tweets.length === 0) {
+              elizaLogger.log(
+                `⚠️ No tweets found for ${token.symbol} in given date range.`
+              );
+              return false;
+            }
 
-        tokenMetricsProvider.upsertTokenMetrics(metrics);
+            elizaLogger.log(`📊 Found ${tweets.length} tweets for analysis`);
 
-        if (metrics.buy_signal) {
-          elizaLogger.log(`🎯 Buy signal detected for ${metrics.symbol}`);
+            // Sentiment-Analyse durchführen
+            const decision = await manager.interaction.analyzeSentiment(
+              token.symbol,
+              tweets
+            );
+
+            if (decision) {
+              elizaLogger.log(`🎯 Buy signal detected for ${token.symbol}`);
+            }
+            token.buy_signal = decision;
+            tokenMetricsProvider.upsertTokenMetrics(token);
+          }
         }
       }
 
@@ -239,13 +250,3 @@ export const analyzeData: Action = {
     ],
   ] as ActionExample[][],
 } as Action;
-
-function analyzeBuySignal(agent: any, dexData: any): boolean {
-  // Implement your buy signal logic here
-  // Example:
-  return (
-    (agent.mindshare || 0) > 80 &&
-    (agent.sentiment || 0) > 0.7 &&
-    (dexData.liquidity || 0) > 100000
-  );
-}
