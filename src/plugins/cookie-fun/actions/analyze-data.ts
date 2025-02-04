@@ -84,9 +84,9 @@ export const analyzeData: Action = {
           timestamp: new Date().toISOString(),
           buy_signal: true, // Force buy for testing
           sell_signal: false, // Initialize
-          entry_price: null, // Will be set when bought
-          exit_price: null, // Will be set when sold
-          profit_loss: null, // Will be calculated when sold
+          // entry_price: null, // Will be set when bought
+          // exit_price: null, // Will be set when sold
+          // profit_loss: null, // Will be calculated when sold
           finalized: false,
         };
 
@@ -131,10 +131,10 @@ export const analyzeData: Action = {
           holder_distribution: "",
           timestamp: new Date().toISOString(),
           buy_signal: analyzeBuySignal(agent, dexData),
-          sell_signal: false,
-          entry_price: null,
-          exit_price: null,
-          profit_loss: null,
+          // sell_signal: false,
+          // entry_price: null,
+          // exit_price: null,
+          // profit_loss: null,
           finalized: false,
         };
 
