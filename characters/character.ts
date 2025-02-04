@@ -9,7 +9,7 @@ export const character: Character = {
   // ...defaultCharacter,
   name: "Eliza",
   plugins: [],
-  clients: [],
+  clients: [Clients.TELEGRAM],
   modelProvider: ModelProviderName.ANTHROPIC,
   settings: {
     secrets: {},
