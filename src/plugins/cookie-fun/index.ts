@@ -8,6 +8,7 @@ import { housekeeping } from "./actions/housekeeping.ts";
 import type { Plugin } from "@elizaos/core";
 import { analyzeData } from "./actions/analyze-data.ts";
 import { tweetMindshare } from "./actions/tweet-mindshare.ts";
+import { analyzeMarket } from "./actions/analyze-market.ts";
 
 export default {
   name: "cookie-fun",
@@ -15,6 +16,7 @@ export default {
   version: "1.0.0",
 
   actions: [
+    analyzeMarket,
     analyzeData,
     buyToken,
     checkSell,

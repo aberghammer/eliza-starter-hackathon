@@ -76,21 +76,17 @@ export const analyzeData: Action = {
           chain_name: ACTIVE_CHAIN,
           symbol: dexData.symbol || "UNKNOWN",
           mindshare: 100, // High mindshare for testing
-          sentiment_score: 1, // High sentiment for testing
           liquidity: dexData.liquidity || 0,
           price_change24h: dexData.price_change24h || 0,
-          holder_distribution: JSON.stringify({
-            whales: "10%", // Large holders (>1% supply)
-            medium: "30%", // Medium holders (0.1-1% supply)
-            retail: "60%", // Small holders (<0.1% supply)
-          }),
+
           timestamp: new Date().toISOString(),
           buy_signal: true, // Force buy for testing
           sell_signal: false, // Initialize
-          // entry_price: null, // Will be set when bought
-          // exit_price: null, // Will be set when sold
-          // profit_loss: null, // Will be calculated when sold
+          price_momentum: 0, // Default value
+          social_momentum: 0, // Default value
+          total_score: 0, // Default value
           finalized: false,
+          price: 0,
         };
 
         tokenMetricsProvider.upsertTokenMetrics(metrics);
@@ -173,13 +169,13 @@ export const analyzeData: Action = {
       {
         user: "{{user1}}",
         content: {
-          text: "Can you query the data for me?",
+          text: "Can you check if there are any buy signals in our system?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "I am checking for trading signals, please wait.",
+          text: "I'm checking the database for active buy recommendations. Please wait...",
           action: "ANALYZE_DATA",
         },
       },
@@ -188,13 +184,13 @@ export const analyzeData: Action = {
       {
         user: "{{user2}}",
         content: {
-          text: "Get the latest trading signals from Cookie.fun",
+          text: "Show me the current trading recommendations.",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Fetching data from Cookie.fun. This may take a moment.",
+          text: "Fetching active buy signals from our records...",
           action: "ANALYZE_DATA",
         },
       },
@@ -203,13 +199,13 @@ export const analyzeData: Action = {
       {
         user: "{{user3}}",
         content: {
-          text: "Analyze the current market data for me.",
+          text: "Do we have any new buy signals?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Starting data analysis... please hold on.",
+          text: "Let me check our database for fresh trading signals.",
           action: "ANALYZE_DATA",
         },
       },
@@ -218,13 +214,13 @@ export const analyzeData: Action = {
       {
         user: "{{user4}}",
         content: {
-          text: "Do you have any buy signals?",
+          text: "Retrieve the latest buy recommendations.",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Let me analyze the data for potential buy signals. Please wait.",
+          text: "I am querying our trading signals. Please hold on...",
           action: "ANALYZE_DATA",
         },
       },
@@ -233,13 +229,13 @@ export const analyzeData: Action = {
       {
         user: "{{user5}}",
         content: {
-          text: "Check Cookie.fun for insights.",
+          text: "What buy signals do we have at the moment?",
         },
       },
       {
         user: "{{eliza}}",
         content: {
-          text: "Querying Cookie.fun for trading insights now.",
+          text: "I'm pulling the current buy recommendations from the system.",
           action: "ANALYZE_DATA",
         },
       },
