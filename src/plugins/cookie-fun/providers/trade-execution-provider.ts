@@ -43,10 +43,17 @@ export class TradeExecutionProvider {
   }
 
   private async getAmountOut(amountIn: string, tokenIn: string, tokenOut: string): Promise<bigint> {
+    const network = await this.provider.getNetwork();
+    
+    // Use chain-specific factory addresses
+    const FACTORY_ADDRESS = {
+        arbitrum: '0x1F98431c8aD98523631AE4a59f267346ea31F984',  // Arbitrum factory
+        base: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD'     // Base factory
+    }[network.name] || '0x1F98431c8aD98523631AE4a59f267346ea31F984';
+
     // First check if pool exists
-    const factoryAddress = '0x33128a8fC17869897dcE68Ed026d694621f6FDfD';
     const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
-    const factory = new ethers.Contract(factoryAddress, factoryAbi, this.provider);
+    const factory = new ethers.Contract(FACTORY_ADDRESS, factoryAbi, this.provider);
     
     const pool = await factory.getPool(tokenIn, tokenOut, 3000);
     elizaLogger.log("Pool address:", pool);
@@ -61,8 +68,6 @@ export class TradeExecutionProvider {
         throw new Error('Pool exists but has no liquidity');
     }
 
-    const network = await this.provider.getNetwork();
-    
     // Use chain-specific Quoter V2 addresses
     const QUOTER_V2 = {
         arbitrum: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
@@ -161,28 +166,16 @@ export class TradeExecutionProvider {
       const receipt = await tx.wait();
       elizaLogger.log("✅ Transaction confirmed:", receipt);
 
-      // Calculate actual amount received from transaction events
-      const transferEvent = receipt.logs
-        .map((log) => {
-          try {
-            return {
-              address: log.address.toLowerCase(),
-              data: log.data,
-              topics: log.topics,
-            };
-          } catch {
-            return null;
-          }
-        })
-        .filter((log) => log?.address === tokenAddress.toLowerCase())
-        .pop();
+      // Calculate actual amounts and price
+      const amountIn = BigInt(amountInWei);
+      const amountOutBigInt = amountOut; // We already have this from getAmountOut
 
-      const amountReceived = transferEvent
-        ? BigInt(transferEvent.data)
-        : BigInt(0);
-      const effectivePrice =
-        parseFloat(ethers.formatEther(amountInWei)) /
-        parseFloat(ethers.formatEther(amountReceived));
+      // Convert to ether for price calculation
+      const ethSpent = parseFloat(ethers.formatEther(amountIn));
+      const tokensReceived = parseFloat(ethers.formatEther(amountOutBigInt));
+
+      // Calculate price as ETH/token
+      const effectivePrice = ethSpent / tokensReceived;
 
       const tradeLog: TradeLog = {
         tradeId: receipt.hash,
@@ -190,12 +183,12 @@ export class TradeExecutionProvider {
         symbol,
         action: "BUY",
         price: effectivePrice,
-        amount: parseFloat(ethers.formatEther(amountReceived)),
+        amount: tokensReceived,
         timestamp: new Date().toISOString(),
       };
 
       elizaLogger.log(
-        `✅ Successfully bought ${symbol} on ${ACTIVE_CHAIN}`,
+        `✅ Successfully bought ${symbol} on ${(await this.provider.getNetwork()).name}`,
         tradeLog
       );
       return tradeLog;
@@ -312,7 +305,7 @@ export class TradeExecutionProvider {
       };
 
       elizaLogger.log(
-        `✅ Successfully sold ${symbol} on ${ACTIVE_CHAIN}`,
+        `✅ Successfully sold ${symbol} on ${(await this.provider.getNetwork()).name}`,
         tradeLog
       );
       return tradeLog;
@@ -327,4 +320,3 @@ export class TradeExecutionProvider {
     }
   }
 }
-

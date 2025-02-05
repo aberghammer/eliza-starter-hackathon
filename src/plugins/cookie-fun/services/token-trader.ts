@@ -103,7 +103,7 @@ export class TokenTrader {
           elizaLogger.log(`Updated metrics: ${JSON.stringify(updatedMetrics)}`);
 
           this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
-          elizaLogger.log(`✅ Bought ${result.symbol} at ${result.price}`);
+          elizaLogger.log(`✅ Bought ${result.symbol || 'UNKNOWN'} at ${result.price}`);
 
           return {
             success: true,
