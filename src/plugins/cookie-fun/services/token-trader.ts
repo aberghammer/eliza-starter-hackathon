@@ -159,6 +159,10 @@ export class TokenTrader {
     const { tokenAddress, chainName, amount = TRADE_AMOUNT, runtime } = params;
 
     const settings = getChainSettings(runtime, chainName);
+    console.log("Chain settings:", {
+        ...settings,
+        privateKey: settings.privateKey ? 'exists' : 'missing'
+    });
     if (!settings.rpcUrl || !settings.privateKey) {
       throw new Error(`Missing required ${chainName} configuration!`);
     }

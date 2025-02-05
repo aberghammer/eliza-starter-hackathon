@@ -9,6 +9,9 @@ import {
 import { HousekeepingService } from "../services/housekeeping.ts";
 import { HOUSEKEEPING_MINUTES } from "../config.ts";
 
+// Use a local interval instead of global
+let housekeepingInterval: NodeJS.Timeout | undefined;
+
 export const housekeeping: Action = {
   name: "HOUSEKEEPING",
   similes: [
@@ -33,6 +36,13 @@ export const housekeeping: Action = {
     _callback: HandlerCallback
   ): Promise<boolean> => {
     try {
+      // Always clear existing interval
+      if (housekeepingInterval) {
+        elizaLogger.log("Stopping existing housekeeping cycle");
+        clearInterval(housekeepingInterval);
+        housekeepingInterval = undefined;
+      }
+
       const service = new HousekeepingService(_runtime);
 
       /* // Initial callback with mode info
@@ -52,8 +62,9 @@ export const housekeeping: Action = {
         ?.toLowerCase()
         .includes("loop");
 
-      if (result && shouldLoop && !global.housekeepingInterval) {
-        global.housekeepingInterval = setInterval(
+      if (result && shouldLoop) {
+        elizaLogger.log(`Starting new housekeeping cycle every ${HOUSEKEEPING_MINUTES} minutes`);
+        housekeepingInterval = setInterval(
           () => service.runCycle(_runtime, _callback),
           HOUSEKEEPING_MINUTES * 60 * 1000
         );
@@ -64,12 +75,6 @@ export const housekeeping: Action = {
             Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000
           ).toLocaleTimeString()}`,
           action: "HOUSEKEEPING_SCHEDULED",
-          data: {
-            intervalMinutes: HOUSEKEEPING_MINUTES,
-            nextRun: new Date(
-              Date.now() + HOUSEKEEPING_MINUTES * 60 * 1000
-            ).toISOString(),
-          },
         });
       } else if (result) {
         // Single run completion message

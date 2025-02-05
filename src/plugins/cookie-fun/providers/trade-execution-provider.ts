@@ -14,47 +14,89 @@ export class TradeExecutionProvider {
 
   constructor(chain: Chain, runtime: IAgentRuntime) {
     const rpcUrl = runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`);
-    const privateKey = runtime.getSetting(
-      `${chain.toUpperCase()}_WALLET_PRIVATE_KEY`
-    );
+    let privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+    
+    // Handle the ${ARBITRUM_WALLET_PRIVATE_KEY} substitution
+    if (privateKey?.includes('${ARBITRUM_WALLET_PRIVATE_KEY}')) {
+        privateKey = runtime.getSetting('ARBITRUM_WALLET_PRIVATE_KEY');
+    }
+
     const routerAddress = runtime.getSetting(
       `${chain.toUpperCase()}_UNISWAP_ROUTER`
     );
     const wethAddress = runtime.getSetting(`${chain.toUpperCase()}_WETH`);
 
+    elizaLogger.log("Chain:", chain);
+    elizaLogger.log("Private Key:", privateKey ? 'exists' : 'missing');
+
     if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
       throw new Error(`Missing required ${chain} configuration!`);
     }
 
+    // Ensure proper 0x prefix
+    const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
+    
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.wallet = new ethers.Wallet(privateKey, this.provider);
+    this.wallet = new ethers.Wallet(formattedKey, this.provider);
     this.ROUTER_ADDRESS = routerAddress;
     this.WETH_ADDRESS = wethAddress;
   }
 
   private async getAmountOut(amountIn: string, tokenIn: string, tokenOut: string): Promise<bigint> {
-    // Use Uniswap V3 Quoter V2 which is more reliable
-    const QUOTER_V2 = '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
+    // First check if pool exists
+    const factoryAddress = '0x33128a8fC17869897dcE68Ed026d694621f6FDfD';
+    const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
+    const factory = new ethers.Contract(factoryAddress, factoryAbi, this.provider);
+    
+    const pool = await factory.getPool(tokenIn, tokenOut, 3000);
+    elizaLogger.log("Pool address:", pool);
+    
+    // Add liquidity check
+    const poolAbi = ['function liquidity() external view returns (uint128)'];
+    const poolContract = new ethers.Contract(pool, poolAbi, this.provider);
+    const liquidity = await poolContract.liquidity();
+    elizaLogger.log("Pool liquidity:", liquidity.toString());
+    
+    if (liquidity === BigInt(0)) {
+        throw new Error('Pool exists but has no liquidity');
+    }
+
+    const network = await this.provider.getNetwork();
+    
+    // Use chain-specific Quoter V2 addresses
+    const QUOTER_V2 = {
+        arbitrum: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
+        base: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a'  // Correct Base QuoterV2 from docs
+    }[network.name] || '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
+
     const quoterAbi = [
-      'function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)'
+        'function quoteExactInput(bytes path, uint256 amountIn) external returns (uint256 amountOut)'
     ];
     
     const quoter = new ethers.Contract(QUOTER_V2, quoterAbi, this.provider);
     
     try {
-      const params = {
-        tokenIn,
-        tokenOut,
-        amountIn,
-        fee: 3000,
-        sqrtPriceLimitX96: 0
-      };
+        elizaLogger.log("Getting quote for:", {
+            tokenIn,
+            tokenOut,
+            amountIn,
+            fee: 3000,
+            quoter: QUOTER_V2
+        });
 
-      const [amountOut] = await quoter.quoteExactInputSingle.staticCall(params);
-      return amountOut;
+        // Encode the path
+        const path = ethers.solidityPacked(
+            ['address', 'uint24', 'address'],
+            [tokenIn, 3000, tokenOut]
+        );
+
+        const amountOut = await quoter.quoteExactInput.staticCall(path, amountIn);
+
+        elizaLogger.log("Quote received:", amountOut.toString());
+        return amountOut;
     } catch (error) {
-      elizaLogger.error("Error getting quote:", error);
-      throw error;
+        elizaLogger.error("Error getting quote:", error);
+        throw error;
     }
   }
 
@@ -184,7 +226,6 @@ export class TradeExecutionProvider {
 
       // Check if we need to approve
       const currentAllowance = await token.allowance(
-        this.wallet.address,
         this.ROUTER_ADDRESS
       );
       if (currentAllowance < BigInt(amountToSell)) {
@@ -286,3 +327,4 @@ export class TradeExecutionProvider {
     }
   }
 }
+

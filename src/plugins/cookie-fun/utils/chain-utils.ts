@@ -1,4 +1,6 @@
 import { Chain } from '../types/Chain.ts';
+import { IAgentRuntime } from '@elizaos/core';
+import { elizaLogger } from '@elizaos/core';
 
 // Type guard to check if a string is a valid Chain
 export function isValidChain(chain: string): chain is Chain {
@@ -46,4 +48,28 @@ export function getChainDisplayName(chain: Chain): string {
     case Chain.AVALANCHE: return 'Avalanche';
     case Chain.BASE: return 'Base';
   }
+}
+
+export function getChainSettings(runtime: IAgentRuntime, chainName: string) {
+  const chain = chainName.toUpperCase();
+  
+  // Get the private key directly from env, don't use string interpolation
+  const privateKey = chain === 'BASE' 
+    ? runtime.getSetting('BASE_WALLET_PRIVATE_KEY') || runtime.getSetting('ARBITRUM_WALLET_PRIVATE_KEY')
+    : runtime.getSetting(`${chain}_WALLET_PRIVATE_KEY`);
+
+  // Add debug logging
+  elizaLogger.log(`Getting settings for ${chain}:`, {
+    rpcUrl: runtime.getSetting(`${chain}_RPC_URL`),
+    privateKey: privateKey ? 'exists' : 'missing',
+    routerAddress: runtime.getSetting(`${chain}_UNISWAP_ROUTER`),
+    wethAddress: runtime.getSetting(`${chain}_WETH`)
+  });
+
+  return {
+    rpcUrl: runtime.getSetting(`${chain}_RPC_URL`),
+    privateKey: privateKey, // Use the directly fetched private key
+    routerAddress: runtime.getSetting(`${chain}_UNISWAP_ROUTER`),
+    wethAddress: runtime.getSetting(`${chain}_WETH`)
+  };
 }
