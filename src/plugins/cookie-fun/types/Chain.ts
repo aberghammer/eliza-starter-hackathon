@@ -1,5 +1,6 @@
 export enum Chain {
   ARBITRUM = 'arbitrum',
   MODE = 'mode',
-  AVALANCHE = 'avalanche'
+  AVALANCHE = 'avalanche',
+  BASE = 'base'
 }
