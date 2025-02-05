@@ -20,6 +20,10 @@ export function getChainId(chainName: string): number {
     case Chain.ARBITRUM: return 42161;
     case Chain.MODE: return 34443;
     case Chain.AVALANCHE: return 43114;
+    case Chain.BASE:
+      return 8453;
+    default:
+      throw new Error(`Unsupported chain: ${chain}`);
   }
 }
 
@@ -30,6 +34,7 @@ export function getExplorerUrl(chainName: string): string {
     case Chain.ARBITRUM: return 'https://arbiscan.io/tx/';
     case Chain.MODE: return 'https://explorer.mode.network/tx/';
     case Chain.AVALANCHE: return 'https://snowtrace.io/tx/';
+    case Chain.BASE: return 'https://basescan.org/tx/';
   }
 }
 
@@ -39,5 +44,6 @@ export function getChainDisplayName(chain: Chain): string {
     case Chain.ARBITRUM: return 'Arbitrum';
     case Chain.MODE: return 'Mode';
     case Chain.AVALANCHE: return 'Avalanche';
+    case Chain.BASE: return 'Base';
   }
 }

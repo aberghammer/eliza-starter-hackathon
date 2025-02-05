@@ -32,6 +32,32 @@ export class TradeExecutionProvider {
     this.WETH_ADDRESS = wethAddress;
   }
 
+  private async getAmountOut(amountIn: string, tokenIn: string, tokenOut: string): Promise<bigint> {
+    // Use Uniswap V3 Quoter V2 which is more reliable
+    const QUOTER_V2 = '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
+    const quoterAbi = [
+      'function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint256 amountIn, uint24 fee, uint160 sqrtPriceLimitX96) params) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)'
+    ];
+    
+    const quoter = new ethers.Contract(QUOTER_V2, quoterAbi, this.provider);
+    
+    try {
+      const params = {
+        tokenIn,
+        tokenOut,
+        amountIn,
+        fee: 3000,
+        sqrtPriceLimitX96: 0
+      };
+
+      const [amountOut] = await quoter.quoteExactInputSingle.staticCall(params);
+      return amountOut;
+    } catch (error) {
+      elizaLogger.error("Error getting quote:", error);
+      throw error;
+    }
+  }
+
   async buyToken(
     tokenAddress: string,
     amountInWei: string
@@ -48,8 +74,7 @@ export class TradeExecutionProvider {
 
       // Router setup with getAmountsOut for price impact calculation
       const routerAbi = [
-        "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
-        "function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)",
+        'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)'
       ];
       const router = new ethers.Contract(
         this.ROUTER_ADDRESS,
@@ -70,22 +95,24 @@ export class TradeExecutionProvider {
       elizaLogger.log("Router Address:", this.ROUTER_ADDRESS);
       elizaLogger.log("Wallet Address:", this.wallet.address);
 
-      // Calculate minimum output amount with slippage
-      const amounts = await router.getAmountsOut(amountInWei, path);
-      const amountOutMin =
-        amounts[1] -
-        (amounts[1] * BigInt(Math.floor(this.SLIPPAGE * 100))) / BigInt(10000);
+      // Get quote and calculate minimum output with slippage
+      const amountOut = await this.getAmountOut(amountInWei, this.WETH_ADDRESS, tokenAddress);
+      const amountOutMin = amountOut - (amountOut * BigInt(Math.floor(this.SLIPPAGE * 100))) / BigInt(10000);
 
       elizaLogger.log("📝 READY TO SEND:");
 
-      const tx = await router.swapExactETHForTokens(
-        amountOutMin,
-        path,
-        this.wallet.address,
-        deadline,
+      const tx = await router.exactInputSingle(
         {
-          value: amountInWei,
-        }
+          tokenIn: this.WETH_ADDRESS,
+          tokenOut: tokenAddress,
+          fee: 3000,
+          recipient: this.wallet.address,
+          deadline: deadline,
+          amountIn: amountInWei,
+          amountOutMinimum: amountOutMin,
+          sqrtPriceLimitX96: 0
+        },
+        { value: amountInWei }
       );
 
       elizaLogger.log("📝 Transaction sent:", tx.hash);
