@@ -183,7 +183,10 @@ export class TwitterInteractionClient {
       await this.postTweet(summary);
       elizaLogger.log("✅ Tweet successfully posted!");
 
-      return shouldBuy === "buy";
+      const finalShouldBuy = shouldBuy.trim().toLowerCase() === "buy";
+
+      elizaLogger.log(finalShouldBuy);
+      return finalShouldBuy;
     } catch (error) {
       elizaLogger.error("❌ Error in analyzeSentiment:", {
         message: error.message,

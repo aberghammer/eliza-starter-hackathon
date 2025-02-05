@@ -49,8 +49,8 @@ export const analyzeData: Action = {
       elizaLogger.log("📊 Starting market analysis...");
 
       //-------------------------------Stellschrauben--------------------------------
-      const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; // Forces analysis of a specific token
-      // const hardcodedTokenToBuy = ""; // Forces analysis of a specific token
+      // const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; // Forces analysis of a specific token
+      const hardcodedTokenToBuy = ""; // Forces analysis of a specific token
 
       const cleanDatabase = false; // Cleans all entries in the database
       //-------------------------------Stellschrauben--------------------------------
@@ -146,7 +146,7 @@ export const analyzeData: Action = {
             if (decision) {
               elizaLogger.log(`🎯 Buy signal detected for ${token.symbol}`);
             }
-            token.buy_signal = decision;
+            // token.buy_signal = decision;
             tokenMetricsProvider.upsertTokenMetrics(token);
           }
         }
