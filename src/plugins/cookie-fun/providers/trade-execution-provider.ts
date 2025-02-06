@@ -3,7 +3,6 @@ import { ethers } from "ethers";
 import type { TradeLog } from "../types/TradeLog.ts";
 import { Chain } from "../types/Chain.ts";
 import type { IAgentRuntime } from "@elizaos/core";
-import { ACTIVE_CHAIN } from "../config.ts";
 
 export class TradeExecutionProvider {
   private readonly provider: ethers.JsonRpcProvider;

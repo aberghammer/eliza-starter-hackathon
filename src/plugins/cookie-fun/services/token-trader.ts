@@ -1,17 +1,11 @@
 import {
   elizaLogger,
   type IAgentRuntime,
-  type HandlerCallback,
 } from "@elizaos/core";
 import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
-import { TRADE_AMOUNT, getChainSettings } from "../config.ts";
-import {
-  stringToChain,
-  getChainId,
-  getExplorerUrl,
-} from "../utils/chain-utils.ts";
-
+import { TRADE_AMOUNT, getChainSettings, CHAINS } from "../config.ts";
+import { stringToChain } from "../utils/chain-utils.ts";
 import { ethers } from "ethers";
 import type { BuyParams, SellParams, TradeResult } from "../types/Trading.ts";
 
@@ -29,7 +23,7 @@ export class TokenTrader {
       const result = await this.executeBuy(params);
 
       if (params.callback) {
-        const explorerUrl = getExplorerUrl(params.chainName);
+        const explorerUrl = CHAINS[stringToChain(params.chainName)].explorer;
         params.callback({
           text: `Successfully bought ${result.symbol} for ${
             params.amount || TRADE_AMOUNT
@@ -203,7 +197,7 @@ export class TokenTrader {
       const result = await this.executeSell(params);
 
       if (params.callback) {
-        const explorerUrl = getExplorerUrl(params.chainName);
+        const explorerUrl = CHAINS[stringToChain(params.chainName)].explorer;      
         params.callback({
           text: `Successfully sold ${result.symbol} at ${
             result.profitLossPercent

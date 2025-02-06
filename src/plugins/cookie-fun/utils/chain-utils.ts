@@ -1,6 +1,7 @@
 import { Chain } from '../types/Chain.ts';
 import { IAgentRuntime } from '@elizaos/core';
 import { elizaLogger } from '@elizaos/core';
+import { CHAINS } from '../config.ts';
 
 // Type guard to check if a string is a valid Chain
 export function isValidChain(chain: string): chain is Chain {
@@ -26,17 +27,6 @@ export function getChainId(chainName: string): number {
       return 8453;
     default:
       throw new Error(`Unsupported chain: ${chain}`);
-  }
-}
-
-// Get explorer URL
-export function getExplorerUrl(chainName: string): string {
-  const chain = stringToChain(chainName);
-  switch (chain) {
-    case Chain.ARBITRUM: return 'https://arbiscan.io/tx/';
-    case Chain.MODE: return 'https://explorer.mode.network/tx/';
-    case Chain.AVALANCHE: return 'https://snowtrace.io/tx/';
-    case Chain.BASE: return 'https://basescan.org/tx/';
   }
 }
 

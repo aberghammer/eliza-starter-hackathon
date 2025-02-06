@@ -1,4 +1,4 @@
-import { elizaLogger, ICacheManager, UUID } from "@elizaos/core";
+import { elizaLogger } from "@elizaos/core";
 
 import {
   ActionExample,
