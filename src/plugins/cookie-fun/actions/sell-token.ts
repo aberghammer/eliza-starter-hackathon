@@ -148,11 +148,6 @@ export const sellToken: Action = {
         profitLossPercent
       );
 
-      const explorerUrls = {
-        [Chain.ARBITRUM]: "https://arbiscan.io/tx/",
-        [Chain.MODE]: "https://explorer.mode.network/tx/",
-        [Chain.AVALANCHE]: "https://snowtrace.io/tx/",
-      };
 
       if (tradeResult) {
         _callback({
