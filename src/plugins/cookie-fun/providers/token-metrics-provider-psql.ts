@@ -214,7 +214,7 @@ export class TokenMetricsProvider {
 
   async getTokensToBuy(): Promise<TokenMetrics[]> {
     const result = await this.db.query(
-      `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE`
+      `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE AND ENTRY_PRICE IS NULL`
     );
     return result.rows; // ✅ Nur die Daten zurückgeben
   }
