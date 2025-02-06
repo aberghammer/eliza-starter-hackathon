@@ -7,6 +7,7 @@ import { TokenTrader } from "./token-trader.ts";
 import { analyzeData } from "../actions/analyze-data.ts";
 import { Memory, State } from "@elizaos/core";
 import { checkSell } from "../actions/check-sell.ts";
+import { analyzeMarket } from "../actions/analyze-market.ts";
 
 export class HousekeepingService {
   private trader: TokenTrader;
@@ -24,6 +25,14 @@ export class HousekeepingService {
     elizaLogger.log("🔄 Running housekeeping cycle...");
 
     try {
+      await analyzeMarket.handler(
+        runtime,
+        {} as Memory,
+        {} as State,
+        {},
+        callback
+      );
+
       // Step 1: Analyze market data and set buy signals
       elizaLogger.log("📊 Running market analysis...");
       await analyzeData.handler(

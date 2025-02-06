@@ -5,9 +5,14 @@ export interface TokenMetrics {
   symbol: string; // z. B. SOL, ETH, BTC
   mindshare: number;
   liquidity: number;
-  price_change24h: number;
-  // Neue Felder zur Entscheidungsfindung:
+  volume_24h: number;
+  holders_count: number;
+
   price_momentum: number;
+  volume_momentum: number;
+  mindshare_momentum: number;
+  liquidity_momentum: number;
+  holders_momentum: number;
   social_momentum: number;
   total_score: number;
   timestamp: string; // Zeitpunkt der Analyse
@@ -18,4 +23,5 @@ export interface TokenMetrics {
   profit_loss?: number;
   finalized: boolean;
   price: number; // Aktueller Preis
+  stop_loss_level?: number;
 }

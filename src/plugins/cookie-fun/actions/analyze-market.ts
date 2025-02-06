@@ -22,11 +22,9 @@ export const analyzeMarket: Action = {
     "MARKET ANALYSIS",
   ],
   description:
-    "Fetches market data from Cookie API and DexScreener, computes trading metrics including short-term momentum (price and social) based on the last historical entry, and updates the database.",
+    "Fetches market data from Cookie API and DexScreener, computes trading metrics using Z-Score normalization for multiple factors.",
 
-  validate: async (_runtime: IAgentRuntime, _message: Memory) => {
-    return true;
-  },
+  validate: async (_runtime: IAgentRuntime, _message: Memory) => true,
 
   handler: async (
     runtime: IAgentRuntime,
@@ -38,132 +36,162 @@ export const analyzeMarket: Action = {
     try {
       elizaLogger.log("📊 Starting market data analysis...");
 
-      // Stellschraube: Falls gewünscht, können alle aktiven Trading-Daten gelöscht werden.
-      const cleanDatabase = false;
-
-      // Provider initialisieren
       const dbConn = runtime.getSetting("DB_CONNECTION_STRING");
       const tokenMetricsProvider = new TokenMetricsProvider(dbConn);
       const cookieApiProvider = new CookieApiProvider(runtime);
       const dexscreenerProvider = new DexscreenerProvider();
 
-      if (cleanDatabase) {
-        await tokenMetricsProvider.cleanupAllTokenMetrics();
-        elizaLogger.log("🧹 Active trading table cleaned.");
-      }
-
-      // Hole Agent-Daten von der Cookie API (z. B. paginiert)
       const agentsResponse = await cookieApiProvider.fetchAgentsPaged(
         "_7Days",
         1,
         10
       );
-      if (!agentsResponse || !agentsResponse.ok || !agentsResponse.ok.data) {
+      if (!agentsResponse?.ok?.data) {
         throw new Error("No agent data returned from Cookie API.");
       }
+
       const agents = agentsResponse.ok.data;
       elizaLogger.log(`Fetched ${agents.length} agents for analysis.`);
 
-      // Iteriere über alle abgerufenen Agenten
       for (const agent of agents) {
-        // Verwende den ersten Vertrag als repräsentativen Token
         const contract = agent.contracts[0];
         if (!contract) {
           elizaLogger.log(`No contract data for agent ${agent.agentName}`);
           continue;
         }
 
-        // Hole zusätzliche Token-Daten via DexScreener (z. B. Liquidität, 24h-Preisänderung, aktueller Preis)
+        const chainMap: Record<string, string> = {
+          "-2": "Solana", // ✅ Solana ist ein String-Key
+          "1": "Ethereum",
+          "56": "Binance Smart Chain",
+          "42161": "Arbitrum",
+          "10": "Optimism",
+          "137": "Polygon",
+          "8453": "Base",
+          "43114": "Avalanche",
+        };
+
+        const chainName = chainMap[String(contract.chain)] || "Unknown";
+
         const dexData = await dexscreenerProvider.fetchTokenPrice(
           contract.contractAddress
         );
 
-        // Aktuelle Werte (wir nehmen an, dass entweder agent oder dexData den aktuellen Preis liefern)
-        const currentPrice = agent.price || dexData.price; // z. B. 0.64325315
-        const currentMindshare = agent.mindshare;
+        // ✅ **Hier sicherstellen, dass die Werte aus dem Backend korrekt sind**
+        const currentMetrics = {
+          price: agent.price || dexData.price,
+          volume_24h: agent.volume24Hours || dexData.volume,
+          mindshare: agent.mindshare,
+          liquidity: agent.liquidity || dexData.liquidit || 0,
+          holders_count: agent.holdersCount,
+        };
 
-        // Standardmäßig nutzen wir die API-Deltas als Fallback
-        let priceMomentum = agent.priceDeltaPercent || 0;
-        let socialMomentum = agent.mindshareDeltaPercent || 0;
-
-        // Versuche, den letzten historischen Eintrag für diesen Token abzurufen,
-        // um kurzfristige (z. B. 5-Minuten-) Deltas zu berechnen.
+        // 📌 Holt vergangene Einträge für Z-Score-Berechnung
         const previousEntries =
           await tokenMetricsProvider.getLatestTokenMetricsForToken(
             contract.contractAddress
           );
-        if (previousEntries && previousEntries.length > 0) {
-          const lastEntry = previousEntries[0];
 
-          // Berechne Price Momentum nur, wenn lastEntry.price ungleich 0 ist.
-          if (
-            lastEntry.price !== undefined &&
-            lastEntry.price !== 0 &&
-            currentPrice !== undefined
-          ) {
-            priceMomentum =
-              ((currentPrice - lastEntry.price) / lastEntry.price) * 100;
-          } else {
-            priceMomentum = 0;
-          }
-
-          // Berechne Social/Mindshare Momentum analog.
-          if (
-            lastEntry.mindshare !== undefined &&
-            lastEntry.mindshare !== 0 &&
-            currentMindshare !== undefined
-          ) {
-            socialMomentum =
-              ((currentMindshare - lastEntry.mindshare) / lastEntry.mindshare) *
-              100;
-          } else {
-            socialMomentum = 0;
-          }
+        if (!previousEntries || previousEntries.length < 3) {
+          elizaLogger.log(
+            `⚠️ Not enough historical data for ${agent.agentName}. Logging metrics anyway.`
+          );
         }
 
-        const scaledPriceMomentum = priceMomentum / 100;
-        const scaledSocialMomentum = socialMomentum / 100;
-        const totalScore =
-          0.4 * scaledPriceMomentum + 0.6 * scaledSocialMomentum;
-        const buySignal = totalScore > 0.2; // Angepasster Schwellenwert für die skalierten Werte
+        const history = {
+          price: previousEntries.map((e) => e.price),
+          volume_24h: previousEntries.map((e) => e.volume_24h),
+          mindshare: previousEntries.map((e) => e.mindshare),
+          liquidity: previousEntries.map((e) => e.liquidity),
+          holders_count: previousEntries.map((e) => e.holders_count),
+        };
 
-        // Erstelle das TokenMetrics-Objekt (wir nehmen an, dass das Interface nun auch ein 'price'-Feld enthält)
+        function computeZScore(value: number, series: number[]): number {
+          if (series.length < 3) return 0;
+          const mean =
+            series.reduce((sum, val) => sum + val, 0) / series.length;
+          const stdDev = Math.sqrt(
+            series.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+              series.length
+          );
+          return stdDev === 0 ? 0 : (value - mean) / stdDev;
+        }
+
+        const scores = {
+          price: computeZScore(currentMetrics.price, history.price),
+          volume_24h: computeZScore(
+            currentMetrics.volume_24h,
+            history.volume_24h
+          ),
+          mindshare: computeZScore(currentMetrics.mindshare, history.mindshare),
+          liquidity: computeZScore(currentMetrics.liquidity, history.liquidity),
+          holders_count: computeZScore(
+            currentMetrics.holders_count,
+            history.holders_count
+          ),
+        };
+
+        const FACTOR_WEIGHTS = {
+          price: 0.4,
+          volume_24h: 0.25,
+          mindshare: 0.15,
+          liquidity: 0.1,
+          holders_count: 0.1,
+        };
+
+        const totalScore = Object.keys(scores).reduce(
+          (sum, key) =>
+            sum +
+            scores[key as keyof typeof scores] *
+              FACTOR_WEIGHTS[key as keyof typeof FACTOR_WEIGHTS],
+          0
+        );
+
+        const buySignal = totalScore >= 0.5;
+        const sellSignal = totalScore <= -0.5;
+
         const tokenMetrics: TokenMetrics = {
           token_address: contract.contractAddress,
           chain_id: contract.chain,
-          chain_name: contract.chain === -2 ? "Solana" : "EVM",
+          chain_name: chainName,
           symbol: agent.agentName,
-          mindshare: currentMindshare,
-          liquidity: dexData.liquidity || 0,
-          price_change24h: dexData.price_change24h || 0,
-          price_momentum: priceMomentum,
-          social_momentum: socialMomentum,
+          mindshare: currentMetrics.mindshare,
+          liquidity: currentMetrics.liquidity,
+          price: currentMetrics.price,
+          volume_24h: currentMetrics.volume_24h,
+          holders_count: currentMetrics.holders_count,
+          price_momentum: scores.price,
+          volume_momentum: scores.volume_24h,
+          mindshare_momentum: scores.mindshare,
+          liquidity_momentum: scores.liquidity,
+          holders_momentum: scores.holders_count,
+          social_momentum: 0, // Falls Social Data verfügbar, ergänzen!
           total_score: totalScore,
           timestamp: new Date().toISOString(),
           buy_signal: buySignal,
-          sell_signal: false,
+          sell_signal: sellSignal,
           entry_price: null,
           exit_price: null,
           profit_loss: null,
           finalized: false,
-          price: currentPrice,
         };
 
-        // 1. Schreibe alle Analyseergebnisse in die historisierte Tabelle
+        // 📌 **Jedes Mal wird in die History geschrieben!**
         await tokenMetricsProvider.insertHistoricalMetrics(tokenMetrics);
-        // 2. Falls ein Kaufsignal vorliegt, upsert in die aktive Trading-Tabelle
+        elizaLogger.log(`📜 Logged ${agent.agentName} to history.`);
+
         if (
           buySignal &&
           (tokenMetrics.chain_id === 42161 || tokenMetrics.chain_id === 8453)
         ) {
           await tokenMetricsProvider.upsertTokenMetrics(tokenMetrics);
           elizaLogger.log(
-            `Buy signal set for ${agent.agentName} in active trading table.`
+            `📈 Buy signal for ${agent.agentName} - Inserted into active trading table.`
           );
+        } else if (sellSignal) {
+          elizaLogger.log(`❌ Sell signal for ${agent.agentName}.`);
         } else {
-          elizaLogger.log(
-            `No buy signal for ${agent.agentName}; only historical data recorded.`
-          );
+          elizaLogger.log(`⚖️ Hold signal for ${agent.agentName}.`);
         }
       }
 
@@ -173,6 +201,7 @@ export const analyzeMarket: Action = {
           action: "ANALYZE_MARKET_COMPLETE",
         });
       }
+
       elizaLogger.log("✅ Market analysis completed successfully.");
       return true;
     } catch (error) {
@@ -191,21 +220,6 @@ export const analyzeMarket: Action = {
         user: "{{eliza}}",
         content: {
           text: "Starting market data analysis...",
-          action: "ANALYZE_MARKET",
-        },
-      },
-    ],
-    [
-      {
-        user: "{{user2}}",
-        content: {
-          text: "Please scan the market and compute trading signals.",
-        },
-      },
-      {
-        user: "{{eliza}}",
-        content: {
-          text: "Analyzing market data. Stand by...",
           action: "ANALYZE_MARKET",
         },
       },

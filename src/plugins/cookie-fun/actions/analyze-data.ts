@@ -77,7 +77,10 @@ export const analyzeData: Action = {
           symbol: dexData.symbol || "UNKNOWN",
           mindshare: 100, // High mindshare for testing
           liquidity: dexData.liquidity || 0,
-          price_change24h: dexData.price_change24h || 0,
+          volume_24h: dexData.volume_24h || 0,
+          holders_count: dexData.holders_count || 0,
+          volume_momentum: 0, // Default value
+          mindshare_momentum: 0, // Default value,
 
           timestamp: new Date().toISOString(),
           buy_signal: true, // Force buy for testing
@@ -85,6 +88,8 @@ export const analyzeData: Action = {
           price_momentum: 0, // Default value
           social_momentum: 0, // Default value
           total_score: 0, // Default value
+          liquidity_momentum: 0, // Default value
+          holders_momentum: 0, // Default value
           finalized: false,
           price: 0,
         };
