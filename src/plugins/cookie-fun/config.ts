@@ -8,7 +8,7 @@ export const ACTIVE_CHAIN = "arbitrum" as const;
 export const TRADE_AMOUNT = "0.0001"; // ETH
 export const PROFIT_TARGET = 30; // 30%
 export const STOP_LOSS = -20; // -20%
-export const HOUSEKEEPING_MINUTES = 5; // Run every X minutes
+export const HOUSEKEEPING_MINUTES = 1; // Run every X minutes
 
 // Chain configurations
 export const CHAINS = {

@@ -76,8 +76,12 @@ export class TokenTrader {
       const tokensToBuy = await this.tokenMetricsProvider.getTokensToBuy();
       elizaLogger.log(`Found ${tokensToBuy.length} tokens with buy signals`);
 
+      let lastResult = null;
+
       for (const token of tokensToBuy) {
         try {
+          elizaLogger.log(`Attempting to buy ${token.symbol} on ${token.chain_name}`);
+          
           const result = await this.executeBuy({
             tokenAddress: token.token_address,
             chainName: token.chain_name,
@@ -85,50 +89,43 @@ export class TokenTrader {
             runtime,
           });
 
-          elizaLogger.log(`Buy result HERE`);
-
           if (!result.success) {
-            elizaLogger.error(`Failed to buy ${result.symbol}`);
+            elizaLogger.error(`Failed to buy ${token.symbol}`);
             continue;
           }
 
-          // Update only what changed after buying
+          // Store last successful result
+          lastResult = result;
+
+          // Update metrics after successful buy
           const updatedMetrics = {
             ...token,
-            buy_signal: false, // Reset buy flag
-            entry_price: result.price, // Already a number, no need to parse
+            buy_signal: false,
+            entry_price: result.price,
             timestamp: new Date().toISOString(),
           };
 
-          elizaLogger.log(`Updated metrics: ${JSON.stringify(updatedMetrics)}`);
-
-          this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
-          elizaLogger.log(`✅ Bought ${result.symbol || 'UNKNOWN'} at ${result.price}`);
-
-          return {
-            success: true,
-            symbol: result.symbol,
-            tokensReceived: result.tokensReceived,
-            price: result.price.toString(),
-            tradeId: result.tradeId,
-          };
+          await this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
+          elizaLogger.log(`✅ Bought ${token.symbol} at ${result.price} on ${token.chain_name}`);
         } catch (error) {
           elizaLogger.error(`❌ Error buying ${token.symbol}:`, error);
         }
       }
-      return {
+
+      // Return the last successful result or a generic success
+      return lastResult ? {
         success: true,
-        symbol: undefined,
-        tokensReceived: undefined,
-        price: undefined,
-        tradeId: undefined,
-        error: undefined,
+        symbol: lastResult.symbol,
+        price: lastResult.price.toString(),
+        tradeId: lastResult.tradeId
+      } : {
+        success: true
       };
     } catch (error) {
       elizaLogger.error("❌ Error processing pending buys:", error);
       return {
         success: false,
-        error: error.message,
+        error: error.message
       };
     }
   }

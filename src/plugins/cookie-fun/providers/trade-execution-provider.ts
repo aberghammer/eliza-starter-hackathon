@@ -44,19 +44,26 @@ export class TradeExecutionProvider {
 
   private async getAmountOut(amountIn: string, tokenIn: string, tokenOut: string): Promise<bigint> {
     const network = await this.provider.getNetwork();
+    elizaLogger.log(`Getting quote on network: ${network.name}`);
     
     // Use chain-specific factory addresses
     const FACTORY_ADDRESS = {
         arbitrum: '0x1F98431c8aD98523631AE4a59f267346ea31F984',  // Arbitrum factory
         base: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD'     // Base factory
-    }[network.name] || '0x1F98431c8aD98523631AE4a59f267346ea31F984';
+    }[network.name];
 
+    if (!FACTORY_ADDRESS) {
+        throw new Error(`Unsupported network: ${network.name}`);
+    }
+
+    elizaLogger.log(`Using factory address: ${FACTORY_ADDRESS}`);
+    
     // First check if pool exists
     const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
     const factory = new ethers.Contract(FACTORY_ADDRESS, factoryAbi, this.provider);
     
     const pool = await factory.getPool(tokenIn, tokenOut, 3000);
-    elizaLogger.log("Pool address:", pool);
+    elizaLogger.log(`Pool address for ${network.name}: ${pool}`);
     
     // Add liquidity check
     const poolAbi = ['function liquidity() external view returns (uint128)'];
