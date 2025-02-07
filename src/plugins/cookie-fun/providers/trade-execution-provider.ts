@@ -21,15 +21,15 @@ export class TradeExecutionProvider {
 
   constructor(chain: Chain, runtime: IAgentRuntime) {
     const rpcUrl = runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`);
-    let privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
-    
-    if (privateKey?.includes('${ARBITRUM_WALLET_PRIVATE_KEY}')) {
-        privateKey = runtime.getSetting('ARBITRUM_WALLET_PRIVATE_KEY');
+    const privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
+
+    // Simple check for valid private key
+    if (!privateKey) {
+        throw new Error('No valid private key found');
     }
 
-    // Use correct router address for Base
     const routerAddress = chain === 'base' ? 
-        this.BASE_ADDRESSES.router :  // Use correct Base Universal Router
+        this.BASE_ADDRESSES.router :
         runtime.getSetting(`${chain.toUpperCase()}_UNISWAP_ROUTER`);
 
     const wethAddress = chain === 'base' ? 
@@ -44,14 +44,11 @@ export class TradeExecutionProvider {
     });
 
     if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
-      throw new Error(`Missing required ${chain} configuration!`);
+        throw new Error(`Missing required ${chain} configuration!`);
     }
 
-    // Ensure proper 0x prefix
-    const formattedKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-    
     this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.wallet = new ethers.Wallet(formattedKey, this.provider);
+    this.wallet = new ethers.Wallet(privateKey, this.provider);
     this.ROUTER_ADDRESS = routerAddress;
     this.WETH_ADDRESS = wethAddress;
   }
@@ -168,120 +165,95 @@ export class TradeExecutionProvider {
     }
   }
 
-  async sellToken(
-    tokenAddress: string,
-    amountToSell: string
-  ): Promise<TradeLog | null> {
+  async sellToken(tokenAddress: string, amountToSell: string): Promise<TradeLog | null> {
     try {
-      // Get token info and approve spending
-      const tokenAbi = [
-        "function symbol() view returns (string)",
-        "function approve(address spender, uint256 amount) external returns (bool)",
-        "function allowance(address owner, address spender) view returns (uint256)",
-      ];
-      const token = new ethers.Contract(tokenAddress, tokenAbi, this.wallet);
-      const symbol = await token.symbol();
+        // Get token info and approve spending
+        const tokenAbi = [
+            "function approve(address spender, uint256 amount) external returns (bool)",
+            "function allowance(address owner, address spender) view returns (uint256)",
+        ];
+        const token = new ethers.Contract(tokenAddress, tokenAbi, this.wallet);
 
-      // Check if we need to approve
-      const currentAllowance = await token.allowance(
-        this.ROUTER_ADDRESS
-      );
-      if (currentAllowance < BigInt(amountToSell)) {
-        elizaLogger.log("🔄 Approving token spend...");
-        const approveTx = await token.approve(
-          this.ROUTER_ADDRESS,
-          amountToSell
+        // Check if we need to approve
+        const currentAllowance = await token.allowance(
+            this.wallet.address,
+            '0x2626664c2603336E57B271c5C0b26F421741e481'  // SwapRouter02
         );
-        await approveTx.wait();
-        elizaLogger.log("✅ Token approval confirmed");
-      }
+        
+        if (currentAllowance < BigInt(amountToSell)) {
+            elizaLogger.log("🔄 Approving token spend...");
+            const approveTx = await token.approve(
+                '0x2626664c2603336E57B271c5C0b26F421741e481',  // SwapRouter02
+                amountToSell
+            );
+            await approveTx.wait();
+            elizaLogger.log("✅ Token approval confirmed");
+        }
 
-      // Router setup
-      const routerAbi = [
-        "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
-        "function getAmountsOut(uint amountIn, address[] memory path) public view returns (uint[] memory amounts)",
-      ];
-      const router = new ethers.Contract(
-        this.ROUTER_ADDRESS,
-        routerAbi,
-        this.wallet
-      );
-      const path = [tokenAddress, this.WETH_ADDRESS];
-      const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+        // Use same router setup as buy function
+        const routerAbi = [
+            'function multicall(uint256 deadline, bytes[] data) external payable returns (bytes[] memory)',
+            'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)',
+            'function unwrapWETH9(uint256 amountMinimum, address recipient) external payable'
+        ];
 
-      // Calculate minimum output amount with slippage
-      const amounts = await router.getAmountsOut(amountToSell, path);
-      const amountOutMin =
-        amounts[1] -
-        (amounts[1] * BigInt(Math.floor(this.SLIPPAGE * 100))) / BigInt(10000);
+        const router = new ethers.Contract(
+            '0x2626664c2603336E57B271c5C0b26F421741e481',
+            routerAbi,
+            this.wallet
+        );
 
-      // Execute the swap
-      const tx = await router.swapExactTokensForETH(
-        amountToSell,
-        amountOutMin,
-        path,
-        this.wallet.address,
-        deadline
-      );
+        // Same params structure as buy, just reversed tokens
+        const swapParams = {
+            tokenIn: tokenAddress,
+            tokenOut: this.WETH_ADDRESS,
+            fee: 10000,  // 1% fee tier
+            recipient: this.wallet.address,
+            amountIn: amountToSell,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        };
 
-      elizaLogger.log("📝 Transaction sent:", tx.hash);
-      const receipt = await tx.wait();
-      elizaLogger.log("✅ Transaction confirmed:", receipt);
+        const swapData = router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
+        const deadline = Math.floor(Date.now() / 1000) + 300;
 
-      // Calculate actual amount received (ETH)
-      const ethReceived = receipt.logs
-        .map((log) => {
-          try {
-            return {
-              address: log.address.toLowerCase(),
-              data: log.data,
-              topics: log.topics,
-            };
-          } catch {
-            return null;
-          }
-        })
-        .filter((log) => log?.address === this.WETH_ADDRESS.toLowerCase())
-        .pop();
+        // Execute multicall with same structure as buy
+        const tx = await router.multicall(
+            deadline,
+            [swapData],
+            { gasLimit: 500000 }
+        );
 
-      const amountReceived = ethReceived ? BigInt(ethReceived.data) : BigInt(0);
+        elizaLogger.log("📝 Transaction sent:", tx.hash);
+        const receipt = await tx.wait();
+        elizaLogger.log("✅ Transaction confirmed:", receipt);
 
-      // Convert amounts to ether for price calculation
-      const ethAmount = parseFloat(ethers.formatEther(amountReceived));
-      const tokenAmount = parseFloat(ethers.formatEther(amountToSell));
+        // Use same log parsing as buy
+        if (receipt.status === 1) {
+            const transferLog = receipt.logs
+                .filter(log => log.topics[0] === ethers.id("Transfer(address,address,uint256)"))
+                .find(log => log.address.toLowerCase() === this.WETH_ADDRESS.toLowerCase());
 
-      // Calculate price as ETH/token
-      const effectivePrice = ethAmount / tokenAmount;
-
-      elizaLogger.log(`💱 Trade details:`, {
-        ethReceived: ethAmount,
-        tokensSpent: tokenAmount,
-        pricePerToken: effectivePrice,
-      });
-
-      const tradeLog: TradeLog = {
-        tradeId: receipt.hash,
-        tokenAddress,
-        symbol,
-        action: "SELL",
-        price: effectivePrice,
-        amount: parseFloat(ethers.formatEther(amountToSell)),
-        timestamp: new Date().toISOString(),
-      };
-
-      elizaLogger.log(
-        `✅ Successfully sold ${symbol} on ${(await this.provider.getNetwork()).name}`,
-        tradeLog
-      );
-      return tradeLog;
+            if (transferLog) {
+                const amountOut = BigInt(transferLog.data);
+                const amountIn = BigInt(amountToSell);
+                
+                const tradeLog: TradeLog = {
+                    tradeId: receipt.hash,
+                    tokenAddress,
+                    symbol: await this.getTokenSymbol(tokenAddress),
+                    action: "SELL",
+                    price: Number(amountOut) / Number(amountIn),
+                    amount: Number(amountIn),
+                    timestamp: new Date().toISOString(),
+                };
+                return tradeLog;
+            }
+        }
+        return null;
     } catch (error) {
-      elizaLogger.error("❌ Trade execution error:", {
-        error,
-        message: error.message,
-        code: error.code,
-        stack: error.stack,
-      });
-      return null;
+        elizaLogger.error("❌ Trade execution error:", error);
+        return null;
     }
   }
 
