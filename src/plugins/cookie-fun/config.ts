@@ -2,7 +2,8 @@ import type { IAgentRuntime } from "@elizaos/core";
 import { Chain } from "./types/Chain";
 
 //-------------------------------Stellschrauben--------------------------------
-export const ACTIVE_CHAIN = "arbitrum" as const;
+//export const ACTIVE_CHAIN = "arbitrum" as const;
+export const ACTIVE_CHAIN = "base" as const;
 
 // Trading parameters
 export const TRADE_AMOUNT = "0.0001"; // ETH
