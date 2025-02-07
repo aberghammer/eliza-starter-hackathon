@@ -139,32 +139,29 @@ export class TradeExecutionProvider {
         const receipt = await tx.wait();
         elizaLogger.log("✅ Transaction confirmed:", receipt);
 
-        // Calculate actual amounts and price
-        const amountIn = BigInt(amountInWei);
-        const amountOutBigInt = await this.getAmountOut(amountInWei, this.WETH_ADDRESS, tokenAddress);
+        // If transaction succeeded, parse the transfer event to get amount received
+        if (receipt.status === 1) {
+            // Find the token transfer log (last Transfer event)
+            const transferLog = receipt.logs
+                .filter(log => log.topics[0] === ethers.id("Transfer(address,address,uint256)"))
+                .find(log => log.address.toLowerCase() === tokenAddress.toLowerCase());
 
-        // Convert to ether for price calculation
-        const ethSpent = parseFloat(ethers.formatEther(amountIn));
-        const tokensReceived = parseFloat(ethers.formatEther(amountOutBigInt));
-
-        // Calculate price as ETH/token
-        const effectivePrice = ethSpent / tokensReceived;
-
-        const tradeLog: TradeLog = {
-            tradeId: receipt.hash,
-            tokenAddress,
-            symbol: await this.getTokenSymbol(tokenAddress),
-            action: "BUY",
-            price: effectivePrice,
-            amount: tokensReceived,
-            timestamp: new Date().toISOString(),
-        };
-
-        elizaLogger.log(
-            `✅ Successfully bought ${await this.getTokenSymbol(tokenAddress)} on ${(await this.provider.getNetwork()).name}`,
-            tradeLog
-        );
-        return tradeLog;
+            if (transferLog) {
+                const amountOut = BigInt(transferLog.data);
+                const amountIn = BigInt(amountInWei);
+                
+                const tradeLog: TradeLog = {
+                    tradeId: receipt.hash,
+                    tokenAddress,
+                    symbol: await this.getTokenSymbol(tokenAddress),
+                    action: "BUY",
+                    price: Number(amountIn) / Number(amountOut),
+                    amount: Number(amountOut),
+                    timestamp: new Date().toISOString(),
+                };
+                return tradeLog;
+            }
+        }
     } catch (error) {
         elizaLogger.error(`Buy execution error:`, error);
         return null;
