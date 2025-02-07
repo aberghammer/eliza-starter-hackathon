@@ -10,16 +10,18 @@ export class TradeExecutionProvider {
   private readonly wallet: ethers.Wallet;
   private readonly ROUTER_ADDRESS: string;
   private readonly WETH_ADDRESS: string;
+  private readonly chain: Chain;
 
   // Add Base-specific addresses
   private readonly BASE_ADDRESSES = {
     factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
     quoter: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
-    router: '0xeC8B0F7Ffe3ae75d7FfAb09429e3675bb63503e4',  // UniversalRouterV1_2
+    router: '0x2626664c2603336E57B271c5C0b26F421741e481',  // SwapRouter02 - this is the correct one
     weth: '0x4200000000000000000000000000000000000006'
   };
 
   constructor(chain: Chain, runtime: IAgentRuntime) {
+    this.chain = chain;
     const rpcUrl = runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`);
     const privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
 
@@ -96,69 +98,135 @@ export class TradeExecutionProvider {
 
   async buyToken(tokenAddress: string, amountInWei: string): Promise<TradeLog | null> {
     try {
-        const routerAbi = [
-            'function multicall(uint256 deadline, bytes[] data) external payable returns (bytes[] memory)',
-            'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)',
-            'function unwrapWETH9(uint256 amountMinimum, address recipient) external payable'
-        ];
+        if (this.chain === 'base') {
+            // Keep existing Base implementation with SwapRouter02
+            const routerAbi = [
+                'function multicall(uint256 deadline, bytes[] data) external payable returns (bytes[] memory)',
+                'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)',
+                'function unwrapWETH9(uint256 amountMinimum, address recipient) external payable'
+            ];
 
-        const router = new ethers.Contract(
-            '0x2626664c2603336E57B271c5C0b26F421741e481',
-            routerAbi,
-            this.wallet
-        );
+            const router = new ethers.Contract(
+                this.ROUTER_ADDRESS,
+                routerAbi,
+                this.wallet
+            );
 
-        // Encode the swap function call
-        const swapParams = {
-            tokenIn: this.WETH_ADDRESS,
-            tokenOut: tokenAddress,
-            fee: 10000,  // 1% fee tier
-            recipient: this.wallet.address,
-            amountIn: amountInWei,
-            amountOutMinimum: 0,
-            sqrtPriceLimitX96: 0
-        };
+            // Encode the swap function call
+            const swapParams = {
+                tokenIn: this.WETH_ADDRESS,
+                tokenOut: tokenAddress,
+                fee: 10000,  // 1% fee tier
+                recipient: this.wallet.address,
+                amountIn: amountInWei,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
 
-        const swapData = router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
-        const deadline = Math.floor(Date.now() / 1000) + 300;
+            const swapData = router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
+            const deadline = Math.floor(Date.now() / 1000) + 300;
 
-        // Execute multicall
-        const tx = await router.multicall(
-            deadline,
-            [swapData],
-            { 
-                value: amountInWei,
-                gasLimit: 500000
+            // Different transaction options based on chain
+            const txOptions = {
+                gasLimit: 500000,
+                value: amountInWei  // Include value for all chains
+            };
+
+            // Execute multicall
+            const tx = await router.multicall(
+                deadline,
+                [swapData],
+                txOptions
+            );
+
+            elizaLogger.log("📝 Transaction sent:", tx.hash);
+            const receipt = await tx.wait();
+            elizaLogger.log("✅ Transaction confirmed:", receipt);
+
+            // If transaction succeeded, parse the transfer event to get amount received
+            if (receipt.status === 1) {
+                // Find the token transfer log (last Transfer event)
+                const transferLog = receipt.logs
+                    .filter(log => log.topics[0] === ethers.id("Transfer(address,address,uint256)"))
+                    .find(log => log.address.toLowerCase() === tokenAddress.toLowerCase());
+
+                if (transferLog) {
+                    const amountOut = BigInt(transferLog.data);
+                    const amountIn = BigInt(amountInWei);
+                    
+                    const tradeLog: TradeLog = {
+                        tradeId: receipt.hash,
+                        tokenAddress,
+                        symbol: await this.getTokenSymbol(tokenAddress),
+                        action: "BUY",
+                        price: Number(amountIn) / Number(amountOut),
+                        amount: Number(amountOut),
+                        timestamp: new Date().toISOString(),
+                    };
+                    return tradeLog;
+                }
             }
-        );
+        } else {
+            // Arbitrum implementation using Uniswap V3 SwapRouter
+            const routerAbi = [
+                'function exactInputSingle(tuple(address tokenIn,address tokenOut,uint24 fee,address recipient,uint256 deadline,uint256 amountIn,uint256 amountOutMinimum,uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)'
+            ];
 
-        elizaLogger.log("📝 Transaction sent:", tx.hash);
-        const receipt = await tx.wait();
-        elizaLogger.log("✅ Transaction confirmed:", receipt);
+            const router = new ethers.Contract(
+                this.ROUTER_ADDRESS,
+                routerAbi,
+                this.wallet
+            );
 
-        // If transaction succeeded, parse the transfer event to get amount received
-        if (receipt.status === 1) {
-            // Find the token transfer log (last Transfer event)
-            const transferLog = receipt.logs
-                .filter(log => log.topics[0] === ethers.id("Transfer(address,address,uint256)"))
-                .find(log => log.address.toLowerCase() === tokenAddress.toLowerCase());
+            const params = {
+                tokenIn: this.WETH_ADDRESS,
+                tokenOut: tokenAddress,
+                fee: 3000,  // 0.3% fee tier for Arbitrum
+                recipient: this.wallet.address,
+                deadline: Math.floor(Date.now() / 1000) + 300,  // Add deadline
+                amountIn: amountInWei,
+                amountOutMinimum: 0,
+                sqrtPriceLimitX96: 0
+            };
 
-            if (transferLog) {
-                const amountOut = BigInt(transferLog.data);
-                const amountIn = BigInt(amountInWei);
-                
-                const tradeLog: TradeLog = {
-                    tradeId: receipt.hash,
-                    tokenAddress,
-                    symbol: await this.getTokenSymbol(tokenAddress),
-                    action: "BUY",
-                    price: Number(amountIn) / Number(amountOut),
-                    amount: Number(amountOut),
-                    timestamp: new Date().toISOString(),
-                };
-                return tradeLog;
+            // Encode with proper tuple structure
+            const tx = await router.exactInputSingle(
+                params,
+                {
+                    value: amountInWei,
+                    gasLimit: 1000000  // Increased gas limit for Arbitrum
+                }
+            );
+
+            elizaLogger.log("📝 Transaction sent:", tx.hash);
+            const receipt = await tx.wait();
+            elizaLogger.log("✅ Transaction confirmed:", receipt);
+
+            // Add log parsing for Arbitrum
+            if (receipt.status === 1) {
+                // Find the token transfer log
+                const transferLog = receipt.logs
+                    .filter(log => log.topics[0] === ethers.id("Transfer(address,address,uint256)"))
+                    .find(log => log.address.toLowerCase() === tokenAddress.toLowerCase());
+
+                if (transferLog) {
+                    const amountOut = BigInt(transferLog.data);
+                    const amountIn = BigInt(amountInWei);
+                    
+                    const tradeLog: TradeLog = {
+                        tradeId: receipt.hash,
+                        tokenAddress,
+                        symbol: await this.getTokenSymbol(tokenAddress),
+                        action: "BUY",
+                        price: Number(amountIn) / Number(amountOut),
+                        amount: Number(amountOut),
+                        timestamp: new Date().toISOString(),
+                    };
+                    return tradeLog;
+                }
             }
         }
+        // ... rest of the function (log parsing etc)
     } catch (error) {
         elizaLogger.error(`Buy execution error:`, error);
         return null;

@@ -7,7 +7,7 @@ import {
   type HandlerCallback,
 } from "@elizaos/core";
 import { TokenTrader } from "../services/token-trader.ts";
-import { ACTIVE_CHAIN } from "../config.ts";
+import { ACTIVE_CHAIN, TRADE_AMOUNT } from "../config.ts";
 
 export const manualSell: Action = {
   name: "MANUAL_SELL",
@@ -30,9 +30,14 @@ export const manualSell: Action = {
       const content = _message.content as any;
       const tokenAddress =
         content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
-      const chainName = content.chain || ACTIVE_CHAIN;
+      
+      // Check if message mentions arbitrum
+      const chainName = content.text?.toLowerCase().includes('arbitrum') ? 'arbitrum' : ACTIVE_CHAIN;
+      
       const amount =
-        content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] || content.amount; // Optional amount for partial sells
+        content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] ||
+        content.amount ||
+        TRADE_AMOUNT;  // Add default TRADE_AMOUNT like in manual-buy
 
       if (!tokenAddress) {
         throw new Error(
@@ -45,7 +50,7 @@ export const manualSell: Action = {
       const result = await trader.manualSell({
         tokenAddress,
         chainName,
-        amount, // Pass optional amount for partial sells
+        amount,
         runtime: _runtime,
         callback: _callback,
       });

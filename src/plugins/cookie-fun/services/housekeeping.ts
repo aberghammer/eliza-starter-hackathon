@@ -8,6 +8,7 @@ import { analyzeData } from "../actions/analyze-data.ts";
 import { Memory, State } from "@elizaos/core";
 import { checkSell } from "../actions/check-sell.ts";
 import { analyzeMarket } from "../actions/analyze-market.ts";
+import { tweetMindshare } from "../actions/tweet-mindshare.ts";
 
 export class HousekeepingService {
   private trader: TokenTrader;
@@ -54,11 +55,21 @@ export class HousekeepingService {
       elizaLogger.log("💰 Processing pending sells...");
       await this.trader.processPendingSells(runtime);
 
+      // Step 5: Post mindshare updates to Twitter
+      elizaLogger.log("📢 Posting mindshare updates...");
+      await tweetMindshare.handler(
+        runtime,
+        {} as Memory,
+        {} as State,
+        {},
+        callback
+      );
+
       elizaLogger.log("✅ Housekeeping cycle completed");
 
       if (callback) {
         callback({
-          text: "✅ Market analysis complete | Buy signals checked | Active trades monitored | Orders processed | System optimized and ready for next cycle",
+          text: "✅ Market analysis complete | Buy signals checked | Active trades monitored | Orders processed | Mindshare tweeted | System optimized and ready for next cycle",
           action: "HOUSEKEEPING_COMPLETE",
         });
       }
