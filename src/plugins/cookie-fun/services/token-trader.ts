@@ -1,7 +1,4 @@
-import {
-  elizaLogger,
-  type IAgentRuntime,
-} from "@elizaos/core";
+import { elizaLogger, type IAgentRuntime } from "@elizaos/core";
 import { TradeExecutionProvider } from "../providers/trade-execution-provider.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
 import { TRADE_AMOUNT, getChainSettings, CHAINS } from "../config.ts";
@@ -74,8 +71,10 @@ export class TokenTrader {
 
       for (const token of tokensToBuy) {
         try {
-          elizaLogger.log(`Attempting to buy ${token.symbol} on ${token.chain_name}`);
-          
+          elizaLogger.log(
+            `Attempting to buy ${token.symbol} on ${token.chain_name}`
+          );
+
           const result = await this.executeBuy({
             tokenAddress: token.token_address,
             chainName: token.chain_name,
@@ -85,6 +84,13 @@ export class TokenTrader {
 
           if (!result.success) {
             elizaLogger.error(`Failed to buy ${token.symbol}`);
+            const updatedMetrics = {
+              ...token,
+              buy_signal: false,
+              timestamp: new Date().toISOString(),
+              token_failed: true,
+            };
+            await this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
             continue;
           }
 
@@ -100,26 +106,30 @@ export class TokenTrader {
           };
 
           await this.tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
-          elizaLogger.log(`✅ Bought ${token.symbol} at ${result.price} on ${token.chain_name}`);
+          elizaLogger.log(
+            `✅ Bought ${token.symbol} at ${result.price} on ${token.chain_name}`
+          );
         } catch (error) {
           elizaLogger.error(`❌ Error buying ${token.symbol}:`, error);
         }
       }
 
       // Return the last successful result or a generic success
-      return lastResult ? {
-        success: true,
-        symbol: lastResult.symbol,
-        price: lastResult.price.toString(),
-        tradeId: lastResult.tradeId
-      } : {
-        success: true
-      };
+      return lastResult
+        ? {
+            success: true,
+            symbol: lastResult.symbol,
+            price: lastResult.price.toString(),
+            tradeId: lastResult.tradeId,
+          }
+        : {
+            success: true,
+          };
     } catch (error) {
       elizaLogger.error("❌ Error processing pending buys:", error);
       return {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -151,8 +161,8 @@ export class TokenTrader {
 
     const settings = getChainSettings(runtime, chainName);
     console.log("Chain settings:", {
-        ...settings,
-        privateKey: settings.privateKey ? 'exists' : 'missing'
+      ...settings,
+      privateKey: settings.privateKey ? "exists" : "missing",
     });
     if (!settings.rpcUrl || !settings.privateKey) {
       throw new Error(`Missing required ${chainName} configuration!`);
@@ -174,7 +184,16 @@ export class TokenTrader {
     elizaLogger.log(`Buy result: ${JSON.stringify(tradeResult)}`);
 
     if (!tradeResult) {
-      throw new Error("Trade execution failed");
+      elizaLogger.error("Trade execution failed");
+      return {
+        success: false,
+        symbol: "",
+        price: 0,
+        tradeId: "",
+        profitLossPercent: 0,
+        tokensSpent: 0,
+        ethReceived: 0,
+      };
     }
 
     elizaLogger.log(
@@ -197,7 +216,7 @@ export class TokenTrader {
       const result = await this.executeSell(params);
 
       if (params.callback) {
-        const explorerUrl = CHAINS[stringToChain(params.chainName)].explorer;      
+        const explorerUrl = CHAINS[stringToChain(params.chainName)].explorer;
         params.callback({
           text: `Successfully sold ${result.symbol} at ${
             result.profitLossPercent

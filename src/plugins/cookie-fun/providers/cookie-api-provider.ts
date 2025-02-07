@@ -54,7 +54,7 @@ export class CookieApiProvider {
   public async fetchAgentsPaged(
     interval: string = "_7Days",
     page: number = 1,
-    pageSize: number = 10
+    pageSize: number = 25
   ): Promise<any> {
     return this.fetchFromApi(
       `agentsPaged?interval=${interval}&page=${page}&pageSize=${pageSize}`

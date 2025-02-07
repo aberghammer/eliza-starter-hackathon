@@ -13,7 +13,6 @@ export interface TokenMetrics {
   mindshare_momentum: number;
   liquidity_momentum: number;
   holders_momentum: number;
-  social_momentum: number;
   total_score: number;
   timestamp: string; // Zeitpunkt der Analyse
   buy_signal: boolean;
@@ -24,4 +23,5 @@ export interface TokenMetrics {
   finalized: boolean;
   price: number; // Aktueller Preis
   stop_loss_level?: number;
+  buy_failed?: boolean;
 }

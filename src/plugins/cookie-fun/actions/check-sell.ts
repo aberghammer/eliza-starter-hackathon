@@ -92,7 +92,7 @@ export const checkSell: Action = {
             ((latestMetrics.volume_24h - trade.volume_24h) / trade.volume_24h) *
             100;
           const isVolumeDropping = volumeDrop < -50;
-          const isSocialMomentumNegative = latestMetrics.social_momentum < -1.0;
+
           const isPriceZScoreBad = latestMetrics.price_momentum < -2.0; // Starke negative Abweichung
 
           // 📌 Dynamischer Trailing Stop-Loss
@@ -106,7 +106,6 @@ export const checkSell: Action = {
             profitLossPercent >= PROFIT_TARGET ||
             profitLossPercent <= stopLossLevel ||
             isVolumeDropping ||
-            isSocialMomentumNegative ||
             isPriceZScoreBad ||
             alwaysFlagsForSell
           ) {
@@ -119,9 +118,12 @@ export const checkSell: Action = {
               ...trade,
               sell_signal: true,
               stop_loss_level: stopLossLevel, // ✅ Stop-Loss-Level speichern
+              exit_price: currentPriceInEth, // Aktueller Preis als Exit-Preis
+              profit_loss: profitLossPercent, // Berechneter Gewinn/Verlust
               timestamp: new Date().toISOString(),
+              finalized: true,
             };
-            tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
+            await tokenMetricsProvider.upsertTokenMetrics(updatedMetrics);
           }
         } catch (error) {
           elizaLogger.error(

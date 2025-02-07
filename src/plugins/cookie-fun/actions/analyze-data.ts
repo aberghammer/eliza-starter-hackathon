@@ -21,7 +21,6 @@ import {
   TwitterManager,
   validateTwitterConfig,
 } from "../providers/index.ts";
-import { Chain } from "../types/Chain";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -69,43 +68,44 @@ export const analyzeData: Action = {
       // If we have a hardcoded token, analyze just that one
       if (hardcodedTokenToBuy) {
         const dexData = await dexscreener.fetchTokenPrice(hardcodedTokenToBuy);
-        
+
         // Use "ZERA" as fallback symbol if dexscreener fails
-        const tokenSymbol = (dexData && dexData.symbol) ? dexData.symbol : "ZERA";
+        const tokenSymbol = dexData && dexData.symbol ? dexData.symbol : "ZERA";
 
         const metrics: TokenMetrics = {
-            token_address: hardcodedTokenToBuy,
-            chain_id: getChainId(ACTIVE_CHAIN),
-            chain_name: ACTIVE_CHAIN,
-            symbol: tokenSymbol,  // Use our fallback symbol
-            mindshare: 100,
-            liquidity: dexData.liquidity || 0,
-            volume_24h: dexData.volume_24h || 0,
-            holders_count: dexData.holders_count || 0,
-            volume_momentum: 0,
-            mindshare_momentum: 0,
-            timestamp: new Date().toISOString(),
-            buy_signal: true,
-            sell_signal: false,
-            price_momentum: 0,
-            social_momentum: 0,
-            total_score: 0,
-            liquidity_momentum: 0,
-            holders_momentum: 0,
-            finalized: false,
-            price: dexData.price || 0,
+          token_address: hardcodedTokenToBuy,
+          chain_id: getChainId(ACTIVE_CHAIN),
+          chain_name: ACTIVE_CHAIN,
+          symbol: tokenSymbol, // Use our fallback symbol
+          mindshare: 100,
+          liquidity: dexData.liquidity || 0,
+          volume_24h: dexData.volume_24h || 0,
+          holders_count: dexData.holders_count || 0,
+          volume_momentum: 0,
+          mindshare_momentum: 0,
+          timestamp: new Date().toISOString(),
+          buy_signal: true,
+          sell_signal: false,
+          price_momentum: 0,
+          total_score: 0,
+          liquidity_momentum: 0,
+          holders_momentum: 0,
+          finalized: false,
+          price: dexData.price || 0,
         };
 
         await tokenMetricsProvider.upsertTokenMetrics(metrics);
-        elizaLogger.log(`🎯 Buy signal set for hardcoded token ${hardcodedTokenToBuy} (${tokenSymbol})`);
+        elizaLogger.log(
+          `🎯 Buy signal set for hardcoded token ${hardcodedTokenToBuy} (${tokenSymbol})`
+        );
       } else {
         const tokensWithBuySignal = await tokenMetricsProvider.getTokensToBuy();
 
         if (tokensWithBuySignal.length > 0) {
           for (const token of tokensWithBuySignal) {
-            const dexData = await dexscreener.fetchTokenPrice(
-              token.token_address
-            );
+            // const dexData = await dexscreener.fetchTokenPrice(
+            //   token.token_address
+            // );
 
             const cookieProvider = new CookieApiProvider(runtime);
             const twitterConfig: TwitterConfig = await validateTwitterConfig(

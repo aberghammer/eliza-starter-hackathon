@@ -79,11 +79,11 @@ export const analyzeMarket: Action = {
 
         // ✅ **Hier sicherstellen, dass die Werte aus dem Backend korrekt sind**
         const currentMetrics = {
-          price: agent.price || dexData.price,
-          volume_24h: agent.volume24Hours || dexData.volume,
-          mindshare: agent.mindshare,
-          liquidity: agent.liquidity || dexData.liquidit || 0,
-          holders_count: agent.holdersCount,
+          price: Number(agent.price) || Number(dexData.price),
+          volume_24h: Number(agent.volume24Hours) || Number(dexData.volume),
+          mindshare: Number(agent.mindshare),
+          liquidity: Number(agent.liquidity) || Number(dexData.liquidit) || 0,
+          holders_count: Number(agent.holdersCount),
         };
 
         // 📌 Holt vergangene Einträge für Z-Score-Berechnung
@@ -97,13 +97,22 @@ export const analyzeMarket: Action = {
             `⚠️ Not enough historical data for ${agent.agentName}. Logging metrics anyway.`
           );
         }
-
         const history = {
-          price: previousEntries.map((e) => e.price),
-          volume_24h: previousEntries.map((e) => e.volume_24h),
-          mindshare: previousEntries.map((e) => e.mindshare),
-          liquidity: previousEntries.map((e) => e.liquidity),
-          holders_count: previousEntries.map((e) => e.holders_count),
+          price: previousEntries
+            .map((e) => Number(e.price))
+            .filter((val) => !isNaN(val)),
+          volume_24h: previousEntries
+            .map((e) => Number(e.volume_24h))
+            .filter((val) => !isNaN(val)),
+          mindshare: previousEntries
+            .map((e) => Number(e.mindshare))
+            .filter((val) => !isNaN(val)),
+          liquidity: previousEntries
+            .map((e) => Number(e.liquidity))
+            .filter((val) => !isNaN(val)),
+          holders_count: previousEntries
+            .map((e) => Number(e.holders_count))
+            .filter((val) => !isNaN(val)),
         };
 
         function computeZScore(value: number, series: number[]): number {
@@ -165,7 +174,6 @@ export const analyzeMarket: Action = {
           mindshare_momentum: scores.mindshare,
           liquidity_momentum: scores.liquidity,
           holders_momentum: scores.holders_count,
-          social_momentum: 0, // Falls Social Data verfügbar, ergänzen!
           total_score: totalScore,
           timestamp: new Date().toISOString(),
           buy_signal: buySignal,

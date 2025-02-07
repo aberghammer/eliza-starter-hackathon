@@ -26,20 +26,20 @@ export class TokenMetricsProvider {
         liquidity REAL DEFAULT 0,
         volume_24h REAL DEFAULT 0,
         holders_count REAL DEFAULT 0,
-        price REAL DEFAULT 0,
-        price_momentum REAL DEFAULT 0,
+        price NUMERIC(20, 10) DEFAULT 0,
+        price_momentum NUMERIC(20, 10) DEFAULT 0,
         volume_momentum REAL DEFAULT 0,
         mindshare_momentum REAL DEFAULT 0,
         liquidity_momentum REAL DEFAULT 0,
         holders_momentum REAL DEFAULT 0,
-        social_momentum REAL DEFAULT 0,
+       
         total_score REAL DEFAULT 0,
         stop_loss_level REAL DEFAULT NULL,  -- ✅ NEU: Stop-Loss-Level
         timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         buy_signal BOOLEAN DEFAULT FALSE,
         sell_signal BOOLEAN DEFAULT FALSE,
-        entry_price REAL,
-        exit_price REAL,
+        entry_price NUMERIC(20, 10),
+        exit_price NUMERIC(20, 10),
         profit_loss REAL,
         finalized BOOLEAN DEFAULT FALSE
       );
@@ -58,16 +58,17 @@ export class TokenMetricsProvider {
         liquidity REAL DEFAULT 0,
         volume_24h REAL DEFAULT 0,
         holders_count REAL DEFAULT 0,
-        price REAL DEFAULT 0,
-        price_momentum REAL DEFAULT 0,
+        price NUMERIC(20, 10) DEFAULT 0,
+        price_momentum NUMERIC(20, 10) DEFAULT 0,
         volume_momentum REAL DEFAULT 0,
         mindshare_momentum REAL DEFAULT 0,
         liquidity_momentum REAL DEFAULT 0,
         holders_momentum REAL DEFAULT 0,
-        social_momentum REAL DEFAULT 0,
+        
         total_score REAL DEFAULT 0,
         stop_loss_level REAL DEFAULT NULL,  -- ✅ NEU: Stop-Loss-Level
-        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        timestamp TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        buy_failed BOOLEAN DEFAULT FALSE
       );
     `;
     await this.db.query(query);
@@ -79,10 +80,10 @@ export class TokenMetricsProvider {
       token_address, chain_id, chain_name, symbol, mindshare, liquidity,
       volume_24h, holders_count, price,
       price_momentum, volume_momentum, mindshare_momentum, liquidity_momentum,
-      holders_momentum, social_momentum, total_score, stop_loss_level, timestamp
+      holders_momentum, total_score, stop_loss_level, timestamp
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8, $9,
-      $10, $11, $12, $13, $14, $15, $16, $17, $18
+      $10, $11, $12, $13, $14, $15, $16, $17
     );
   `;
 
@@ -102,7 +103,7 @@ export class TokenMetricsProvider {
         metrics.mindshare_momentum,
         metrics.liquidity_momentum,
         metrics.holders_momentum,
-        metrics.social_momentum,
+
         metrics.total_score,
         metrics.stop_loss_level, // ✅ Neu hinzugefügt
         metrics.timestamp,
@@ -123,41 +124,41 @@ export class TokenMetricsProvider {
   async upsertTokenMetrics(metrics: TokenMetrics): Promise<boolean> {
     const query = `
   INSERT INTO token_metrics (
-    token_address, chain_id, chain_name, symbol, mindshare, liquidity, 
-    volume_24h, holders_count, price,
-    price_momentum, volume_momentum, mindshare_momentum, liquidity_momentum,
-    holders_momentum, social_momentum, total_score, stop_loss_level,
-    timestamp, buy_signal, sell_signal, entry_price, exit_price, profit_loss, finalized
-  ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9,
-    $10, $11, $12, $13, $14, $15, $16, $17,
-    $18, $19, $20, $21, $22, $23, $24
-  )
-  ON CONFLICT (token_address, chain_id)
-  WHERE finalized = FALSE
-  DO UPDATE SET
-    chain_name = EXCLUDED.chain_name,
-    symbol = EXCLUDED.symbol,
-    mindshare = EXCLUDED.mindshare,
-    liquidity = EXCLUDED.liquidity,
-    volume_24h = EXCLUDED.volume_24h,
-    holders_count = EXCLUDED.holders_count,
-    price = EXCLUDED.price,
-    price_momentum = EXCLUDED.price_momentum,
-    volume_momentum = EXCLUDED.volume_momentum,
-    mindshare_momentum = EXCLUDED.mindshare_momentum,
-    liquidity_momentum = EXCLUDED.liquidity_momentum,
-    holders_momentum = EXCLUDED.holders_momentum,
-    social_momentum = EXCLUDED.social_momentum,
-    total_score = EXCLUDED.total_score,
-    stop_loss_level = EXCLUDED.stop_loss_level, 
-    timestamp = EXCLUDED.timestamp,
-    buy_signal = EXCLUDED.buy_signal,
-    sell_signal = EXCLUDED.sell_signal,
-    entry_price = COALESCE(token_metrics.entry_price, EXCLUDED.entry_price),
-    exit_price = COALESCE(token_metrics.exit_price, EXCLUDED.exit_price),
-    profit_loss = COALESCE(token_metrics.profit_loss, EXCLUDED.profit_loss),
-    finalized = EXCLUDED.finalized;
+  token_address, chain_id, chain_name, symbol, mindshare, liquidity, 
+  volume_24h, holders_count, price,
+  price_momentum, volume_momentum, mindshare_momentum, liquidity_momentum,
+  holders_momentum, total_score, stop_loss_level,
+  timestamp, buy_signal, sell_signal, entry_price, exit_price, profit_loss, finalized, buy_failed
+) VALUES (
+  $1, $2, $3, $4, $5, $6, $7, $8, $9,
+  $10, $11, $12, $13, $14, $15, $16, $17,
+  $18, $19, $20, $21, $22, $23, $24
+)
+ON CONFLICT (token_address, chain_id)
+WHERE finalized = FALSE
+DO UPDATE SET
+  chain_name = EXCLUDED.chain_name,
+  symbol = EXCLUDED.symbol,
+  mindshare = EXCLUDED.mindshare,
+  liquidity = EXCLUDED.liquidity,
+  volume_24h = EXCLUDED.volume_24h,
+  holders_count = EXCLUDED.holders_count,
+  price = EXCLUDED.price,
+  price_momentum = EXCLUDED.price_momentum,
+  volume_momentum = EXCLUDED.volume_momentum,
+  mindshare_momentum = EXCLUDED.mindshare_momentum,
+  liquidity_momentum = EXCLUDED.liquidity_momentum,
+  holders_momentum = EXCLUDED.holders_momentum,
+  total_score = EXCLUDED.total_score,
+  stop_loss_level = EXCLUDED.stop_loss_level, 
+  timestamp = EXCLUDED.timestamp,
+  buy_signal = EXCLUDED.buy_signal,
+  sell_signal = EXCLUDED.sell_signal,
+  entry_price = COALESCE(token_metrics.entry_price, EXCLUDED.entry_price),
+  exit_price = COALESCE(token_metrics.exit_price, EXCLUDED.exit_price),
+  profit_loss = COALESCE(token_metrics.profit_loss, EXCLUDED.profit_loss),
+  finalized = EXCLUDED.finalized,
+  buy_failed = EXCLUDED.buy_failed;
 `;
 
     try {
@@ -176,7 +177,7 @@ export class TokenMetricsProvider {
         metrics.mindshare_momentum,
         metrics.liquidity_momentum,
         metrics.holders_momentum,
-        metrics.social_momentum,
+
         metrics.total_score,
         metrics.stop_loss_level, // ✅ Neu hinzugefügt
         metrics.timestamp,
@@ -186,6 +187,7 @@ export class TokenMetricsProvider {
         metrics.exit_price ?? null,
         metrics.profit_loss ?? null,
         metrics.finalized,
+        metrics.buy_failed ?? false,
       ]);
       console.log(`✅ TokenMetrics für ${metrics.token_address} gespeichert.`);
       return true;
@@ -196,11 +198,12 @@ export class TokenMetricsProvider {
   }
 
   async getLatestTokenMetricsForToken(
-    token_address: string
+    token_address: string,
+    limit: number = 10
   ): Promise<TokenMetrics[]> {
     const result = await this.db.query(
-      `SELECT * FROM token_metrics_history WHERE token_address = $1 ORDER BY timestamp DESC LIMIT 3`,
-      [token_address]
+      `SELECT * FROM token_metrics_history WHERE token_address = $1 ORDER BY timestamp DESC LIMIT $2`,
+      [token_address, limit]
     );
     return result.rows;
   }
@@ -214,7 +217,7 @@ export class TokenMetricsProvider {
 
   async getTokensToBuy(): Promise<TokenMetrics[]> {
     const result = await this.db.query(
-      `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE AND ENTRY_PRICE IS NULL`
+      `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE AND ENTRY_PRICE IS NULL AND buy_failed = FALSE`
     );
     return result.rows; // ✅ Nur die Daten zurückgeben
   }
