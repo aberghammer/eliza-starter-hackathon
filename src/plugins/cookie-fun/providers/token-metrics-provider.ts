@@ -51,7 +51,11 @@
 
 //   async getTokensToBuy(): Promise<TokenMetrics[]> {
 //     const result = await this.db.query(
-//       `SELECT * FROM token_metrics WHERE buy_signal = TRUE AND finalized = FALSE`
+//       `SELECT * FROM token_metrics 
+//        WHERE buy_signal = TRUE 
+//        AND finalized = FALSE
+//        ORDER BY timestamp DESC
+//        LIMIT 1`
 //     );
 //     return result.rows;
 //   }

@@ -5,28 +5,43 @@ import { Chain } from "../types/Chain.ts";
 import type { IAgentRuntime } from "@elizaos/core";
 
 export class TradeExecutionProvider {
+  private readonly SLIPPAGE = 0.5; // 0.5% slippage tolerance
   private readonly provider: ethers.JsonRpcProvider;
   private readonly wallet: ethers.Wallet;
-  private readonly SLIPPAGE = 0.5; // 0.5% slippage tolerance
   private readonly ROUTER_ADDRESS: string;
   private readonly WETH_ADDRESS: string;
+
+  // Add Base-specific addresses
+  private readonly BASE_ADDRESSES = {
+    factory: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD',
+    quoter: '0x0d5e0f971ed27fbff6c2837bf31316121532048d',
+    router: '0xeC8B0F7Ffe3ae75d7FfAb09429e3675bb63503e4',  // UniversalRouterV1_2
+    weth: '0x4200000000000000000000000000000000000006'
+  };
 
   constructor(chain: Chain, runtime: IAgentRuntime) {
     const rpcUrl = runtime.getSetting(`${chain.toUpperCase()}_RPC_URL`);
     let privateKey = runtime.getSetting(`${chain.toUpperCase()}_WALLET_PRIVATE_KEY`);
     
-    // Handle the ${ARBITRUM_WALLET_PRIVATE_KEY} substitution
     if (privateKey?.includes('${ARBITRUM_WALLET_PRIVATE_KEY}')) {
         privateKey = runtime.getSetting('ARBITRUM_WALLET_PRIVATE_KEY');
     }
 
-    const routerAddress = runtime.getSetting(
-      `${chain.toUpperCase()}_UNISWAP_ROUTER`
-    );
-    const wethAddress = runtime.getSetting(`${chain.toUpperCase()}_WETH`);
+    // Use correct router address for Base
+    const routerAddress = chain === 'base' ? 
+        this.BASE_ADDRESSES.router :  // Use correct Base Universal Router
+        runtime.getSetting(`${chain.toUpperCase()}_UNISWAP_ROUTER`);
 
-    elizaLogger.log("Chain:", chain);
-    elizaLogger.log("Private Key:", privateKey ? 'exists' : 'missing');
+    const wethAddress = chain === 'base' ? 
+        this.BASE_ADDRESSES.weth :
+        runtime.getSetting(`${chain.toUpperCase()}_WETH`);
+
+    elizaLogger.log("Chain settings:", {
+        rpcUrl,
+        privateKey: privateKey ? 'exists' : 'missing',
+        routerAddress,
+        wethAddress
+    });
 
     if (!rpcUrl || !privateKey || !routerAddress || !wethAddress) {
       throw new Error(`Missing required ${chain} configuration!`);
@@ -45,167 +60,114 @@ export class TradeExecutionProvider {
     const network = await this.provider.getNetwork();
     elizaLogger.log(`Getting quote on network: ${network.name}`);
     
-    // Use chain-specific factory addresses
-    const FACTORY_ADDRESS = {
-        arbitrum: '0x1F98431c8aD98523631AE4a59f267346ea31F984',  // Arbitrum factory
-        base: '0x33128a8fC17869897dcE68Ed026d694621f6FDfD'     // Base factory
-    }[network.name];
-
-    if (!FACTORY_ADDRESS) {
-        throw new Error(`Unsupported network: ${network.name}`);
+    // Try all fee tiers
+    const feeTiers = [100, 500, 3000, 10000];
+    let bestQuote = BigInt(0);
+    
+    for (const fee of feeTiers) {
+        try {
+            // Use QuoterV2 interface
+            const quoterAbi = [
+                'function quoteExactInputSingle(tuple(address tokenIn, address tokenOut, uint24 fee, uint256 amountIn, uint160 sqrtPriceLimitX96)) external returns (uint256 amountOut, uint160 sqrtPriceX96After, uint32 initializedTicksCrossed, uint256 gasEstimate)'
+            ];
+            const quoter = new ethers.Contract(this.BASE_ADDRESSES.quoter, quoterAbi, this.provider);
+            
+            const params = {
+                tokenIn,
+                tokenOut,
+                fee,
+                amountIn,
+                sqrtPriceLimitX96: 0
+            };
+            
+            const [quote] = await quoter.quoteExactInputSingle.staticCall(params);
+            if (quote > bestQuote) {
+                bestQuote = quote;
+                elizaLogger.log(`Found better quote with fee tier ${fee}: ${quote.toString()}`);
+            }
+        } catch (error) {
+            elizaLogger.log(`No pool found for fee tier ${fee}`);
+        }
     }
 
-    elizaLogger.log(`Using factory address: ${FACTORY_ADDRESS}`);
-    
-    // First check if pool exists
-    const factoryAbi = ['function getPool(address,address,uint24) view returns (address)'];
-    const factory = new ethers.Contract(FACTORY_ADDRESS, factoryAbi, this.provider);
-    
-    const pool = await factory.getPool(tokenIn, tokenOut, 3000);
-    elizaLogger.log(`Pool address for ${network.name}: ${pool}`);
-    
-    // Add liquidity check
-    const poolAbi = ['function liquidity() external view returns (uint128)'];
-    const poolContract = new ethers.Contract(pool, poolAbi, this.provider);
-    const liquidity = await poolContract.liquidity();
-    elizaLogger.log("Pool liquidity:", liquidity.toString());
-    
-    if (liquidity === BigInt(0)) {
-        throw new Error('Pool exists but has no liquidity');
+    if (bestQuote === BigInt(0)) {
+        throw new Error('No valid pool found for this token pair');
     }
 
-    // Use chain-specific Quoter V2 addresses
-    const QUOTER_V2 = {
-        arbitrum: '0x61fFE014bA17989E743c5F6cB21bF9697530B21e',
-        base: '0x3d4e44Eb1374240CE5F1B871ab261CD16335B76a'  // Correct Base QuoterV2 from docs
-    }[network.name] || '0x61fFE014bA17989E743c5F6cB21bF9697530B21e';
-
-    const quoterAbi = [
-        'function quoteExactInput(bytes path, uint256 amountIn) external returns (uint256 amountOut)'
-    ];
-    
-    const quoter = new ethers.Contract(QUOTER_V2, quoterAbi, this.provider);
-    
-    try {
-        elizaLogger.log("Getting quote for:", {
-            tokenIn,
-            tokenOut,
-            amountIn,
-            fee: 3000,
-            quoter: QUOTER_V2
-        });
-
-        // Encode the path
-        const path = ethers.solidityPacked(
-            ['address', 'uint24', 'address'],
-            [tokenIn, 3000, tokenOut]
-        );
-
-        const amountOut = await quoter.quoteExactInput.staticCall(path, amountIn);
-
-        elizaLogger.log("Quote received:", amountOut.toString());
-        return amountOut;
-    } catch (error) {
-        elizaLogger.error("Error getting quote:", error);
-        throw error;
-    }
+    return bestQuote;
   }
 
-  async buyToken(
-    tokenAddress: string,
-    amountInWei: string
-  ): Promise<TradeLog | null> {
+  async buyToken(tokenAddress: string, amountInWei: string): Promise<TradeLog | null> {
     try {
-      elizaLogger.log("📝 BUY TOKEN " + tokenAddress);
+        const routerAbi = [
+            'function multicall(uint256 deadline, bytes[] data) external payable returns (bytes[] memory)',
+            'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)',
+            'function unwrapWETH9(uint256 amountMinimum, address recipient) external payable'
+        ];
 
-      elizaLogger.log("provider" + (await this.provider.getNetwork())); //er kackt ab sobald ich auf den provider zugreifen will
+        const router = new ethers.Contract(
+            '0x2626664c2603336E57B271c5C0b26F421741e481',
+            routerAbi,
+            this.wallet
+        );
 
-      // Get token info
-      const tokenAbi = ["function symbol() view returns (string)"];
-      const token = new ethers.Contract(tokenAddress, tokenAbi, this.provider);
-      const symbol = await token.symbol();
+        // Encode the swap function call
+        const swapParams = {
+            tokenIn: this.WETH_ADDRESS,
+            tokenOut: tokenAddress,
+            fee: 10000,  // 1% fee tier
+            recipient: this.wallet.address,
+            amountIn: amountInWei,
+            amountOutMinimum: 0,
+            sqrtPriceLimitX96: 0
+        };
 
-      // Router setup with getAmountsOut for price impact calculation
-      const routerAbi = [
-        'function exactInputSingle((address tokenIn, address tokenOut, uint24 fee, address recipient, uint256 deadline, uint256 amountIn, uint256 amountOutMinimum, uint160 sqrtPriceLimitX96)) external payable returns (uint256 amountOut)'
-      ];
-      const router = new ethers.Contract(
-        this.ROUTER_ADDRESS,
-        routerAbi,
-        this.wallet
-      );
-      const path = [this.WETH_ADDRESS, tokenAddress];
-      const deadline = Math.floor(Date.now() / 1000) + 300; // 5 minutes
+        const swapData = router.interface.encodeFunctionData('exactInputSingle', [swapParams]);
+        const deadline = Math.floor(Date.now() / 1000) + 300;
 
-      elizaLogger.log("📝 CHECKING ROUTER");
+        // Execute multicall
+        const tx = await router.multicall(
+            deadline,
+            [swapData],
+            { 
+                value: amountInWei,
+                gasLimit: 500000
+            }
+        );
 
-      elizaLogger.log("🔍 Checking price impact for trade:");
-      elizaLogger.log("WETH_ADDRESS:", this.WETH_ADDRESS);
-      elizaLogger.log("Token Address:", tokenAddress);
-      elizaLogger.log("Amount In:", amountInWei);
-      elizaLogger.log("Path:", path);
-      elizaLogger.log("Deadline:", deadline);
-      elizaLogger.log("Router Address:", this.ROUTER_ADDRESS);
-      elizaLogger.log("Wallet Address:", this.wallet.address);
+        elizaLogger.log("📝 Transaction sent:", tx.hash);
+        const receipt = await tx.wait();
+        elizaLogger.log("✅ Transaction confirmed:", receipt);
 
-      // Get quote and calculate minimum output with slippage
-      const amountOut = await this.getAmountOut(amountInWei, this.WETH_ADDRESS, tokenAddress);
-      const amountOutMin = amountOut - (amountOut * BigInt(Math.floor(this.SLIPPAGE * 100))) / BigInt(10000);
+        // Calculate actual amounts and price
+        const amountIn = BigInt(amountInWei);
+        const amountOutBigInt = await this.getAmountOut(amountInWei, this.WETH_ADDRESS, tokenAddress);
 
-      elizaLogger.log("📝 READY TO SEND:");
+        // Convert to ether for price calculation
+        const ethSpent = parseFloat(ethers.formatEther(amountIn));
+        const tokensReceived = parseFloat(ethers.formatEther(amountOutBigInt));
 
-      const tx = await router.exactInputSingle(
-        {
-          tokenIn: this.WETH_ADDRESS,
-          tokenOut: tokenAddress,
-          fee: 3000,
-          recipient: this.wallet.address,
-          deadline: deadline,
-          amountIn: amountInWei,
-          amountOutMinimum: amountOutMin,
-          sqrtPriceLimitX96: 0
-        },
-        { value: amountInWei }
-      );
+        // Calculate price as ETH/token
+        const effectivePrice = ethSpent / tokensReceived;
 
-      elizaLogger.log("📝 Transaction sent:", tx.hash);
-      const receipt = await tx.wait();
-      elizaLogger.log("✅ Transaction confirmed:", receipt);
+        const tradeLog: TradeLog = {
+            tradeId: receipt.hash,
+            tokenAddress,
+            symbol: await this.getTokenSymbol(tokenAddress),
+            action: "BUY",
+            price: effectivePrice,
+            amount: tokensReceived,
+            timestamp: new Date().toISOString(),
+        };
 
-      // Calculate actual amounts and price
-      const amountIn = BigInt(amountInWei);
-      const amountOutBigInt = amountOut; // We already have this from getAmountOut
-
-      // Convert to ether for price calculation
-      const ethSpent = parseFloat(ethers.formatEther(amountIn));
-      const tokensReceived = parseFloat(ethers.formatEther(amountOutBigInt));
-
-      // Calculate price as ETH/token
-      const effectivePrice = ethSpent / tokensReceived;
-
-      const tradeLog: TradeLog = {
-        tradeId: receipt.hash,
-        tokenAddress,
-        symbol,
-        action: "BUY",
-        price: effectivePrice,
-        amount: tokensReceived,
-        timestamp: new Date().toISOString(),
-      };
-
-      elizaLogger.log(
-        `✅ Successfully bought ${symbol} on ${(await this.provider.getNetwork()).name}`,
-        tradeLog
-      );
-      return tradeLog;
+        elizaLogger.log(
+            `✅ Successfully bought ${await this.getTokenSymbol(tokenAddress)} on ${(await this.provider.getNetwork()).name}`,
+            tradeLog
+        );
+        return tradeLog;
     } catch (error) {
-      elizaLogger.error("❌ Trade execution error:", {
-        error,
-        message: error.message,
-        code: error.code,
-        stack: error.stack,
-      });
-      return null;
+        elizaLogger.error(`Buy execution error:`, error);
+        return null;
     }
   }
 
@@ -324,5 +286,11 @@ export class TradeExecutionProvider {
       });
       return null;
     }
+  }
+
+  private async getTokenSymbol(tokenAddress: string): Promise<string> {
+    const tokenAbi = ["function symbol() view returns (string)"];
+    const token = new ethers.Contract(tokenAddress, tokenAbi, this.provider);
+    return await token.symbol();
   }
 }

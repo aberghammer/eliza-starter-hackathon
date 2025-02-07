@@ -21,6 +21,7 @@ import {
   TwitterManager,
   validateTwitterConfig,
 } from "../providers/index.ts";
+import { Chain } from "../types/Chain";
 
 export const analyzeData: Action = {
   name: "ANALYZE_DATA",
@@ -49,9 +50,7 @@ export const analyzeData: Action = {
       elizaLogger.log("📊 Starting market analysis...");
 
       //-------------------------------Stellschrauben--------------------------------
-      // const hardcodedTokenToBuy = "0x912ce59144191c1204e64559fe8253a0e49e6548"; // Forces analysis of a specific token
-      const hardcodedTokenToBuy = ""; // Forces analysis of a specific token
-
+      const hardcodedTokenToBuy = "0xba5a56756f9526565410c4614E14a1C9De8248ba"; // Forces analysis of a specific token
       const cleanDatabase = false; // Cleans all entries in the database
       //-------------------------------Stellschrauben--------------------------------
 
@@ -69,35 +68,35 @@ export const analyzeData: Action = {
       // If we have a hardcoded token, analyze just that one
       if (hardcodedTokenToBuy) {
         const dexData = await dexscreener.fetchTokenPrice(hardcodedTokenToBuy);
+        
+        // Use "ZERA" as fallback symbol if dexscreener fails
+        const tokenSymbol = (dexData && dexData.symbol) ? dexData.symbol : "ZERA";
 
         const metrics: TokenMetrics = {
-          token_address: hardcodedTokenToBuy,
-          chain_id: getChainId(ACTIVE_CHAIN),
-          chain_name: ACTIVE_CHAIN,
-          symbol: dexData.symbol || "UNKNOWN",
-          mindshare: 100, // High mindshare for testing
-          liquidity: dexData.liquidity || 0,
-          volume_24h: dexData.volume_24h || 0,
-          holders_count: dexData.holders_count || 0,
-          volume_momentum: 0, // Default value
-          mindshare_momentum: 0, // Default value,
-
-          timestamp: new Date().toISOString(),
-          buy_signal: true, // Force buy for testing
-          sell_signal: false, // Initialize
-          price_momentum: 0, // Default value
-          social_momentum: 0, // Default value
-          total_score: 0, // Default value
-          liquidity_momentum: 0, // Default value
-          holders_momentum: 0, // Default value
-          finalized: false,
-          price: 0,
+            token_address: hardcodedTokenToBuy,
+            chain_id: getChainId(ACTIVE_CHAIN),
+            chain_name: ACTIVE_CHAIN,
+            symbol: tokenSymbol,  // Use our fallback symbol
+            mindshare: 100,
+            liquidity: dexData.liquidity || 0,
+            volume_24h: dexData.volume_24h || 0,
+            holders_count: dexData.holders_count || 0,
+            volume_momentum: 0,
+            mindshare_momentum: 0,
+            timestamp: new Date().toISOString(),
+            buy_signal: true,
+            sell_signal: false,
+            price_momentum: 0,
+            social_momentum: 0,
+            total_score: 0,
+            liquidity_momentum: 0,
+            holders_momentum: 0,
+            finalized: false,
+            price: dexData.price || 0,
         };
 
-        tokenMetricsProvider.upsertTokenMetrics(metrics);
-        elizaLogger.log(
-          `🎯 Buy signal set for hardcoded token ${hardcodedTokenToBuy}`
-        );
+        await tokenMetricsProvider.upsertTokenMetrics(metrics);
+        elizaLogger.log(`🎯 Buy signal set for hardcoded token ${hardcodedTokenToBuy} (${tokenSymbol})`);
       } else {
         const tokensWithBuySignal = await tokenMetricsProvider.getTokensToBuy();
 
