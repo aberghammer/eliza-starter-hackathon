@@ -32,7 +32,10 @@ export const manualBuy: Action = {
       const content = _message.content as any;
       const tokenAddress =
         content.tokenAddress || content.text?.match(/0x[a-fA-F0-9]{40}/)?.[0];
-      const chainName = content.chain || ACTIVE_CHAIN;
+      
+      // Check if message mentions arbitrum
+      const chainName = content.text?.toLowerCase().includes('arbitrum') ? 'arbitrum' : ACTIVE_CHAIN;
+      
       const amount =
         content.text?.match(/(\d*\.?\d+)\s*eth/i)?.[1] ||
         content.amount ||
