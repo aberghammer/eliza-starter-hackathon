@@ -50,7 +50,8 @@ export const analyzeData: Action = {
       elizaLogger.log("📊 Starting market analysis...");
 
       //-------------------------------Stellschrauben--------------------------------
-      const hardcodedTokenToBuy = "0xba5a56756f9526565410c4614E14a1C9De8248ba"; // Forces analysis of a specific token
+      //const hardcodedTokenToBuy = "0xba5a56756f9526565410c4614E14a1C9De8248ba"; // Forces analysis of a specific token
+      const hardcodedTokenToBuy = ""; // Forces analysis of a specific token
       const cleanDatabase = false; // Cleans all entries in the database
       //-------------------------------Stellschrauben--------------------------------
 
