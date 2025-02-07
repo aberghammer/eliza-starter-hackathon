@@ -2,11 +2,11 @@
 
 ## ElizaOS Starter with Cookie.fun
 
-As part of the Cookie **DeFAI Hackathon**, participating in both the **AI Track** and **Arbitrum Track**, we leveraged the ElizaOS starter repository to develop a custom auto-trading plugin. Our solution enables automated trading on EVM-compatible blockchains like **BASE** and **ARBITRUM**, integrating real-time on-chain data, sentiment analysis, and advanced trading logic to optimize decision-making in decentralized finance.
+As part of the Cookie **DeFAI Hackathon**, participating in both the **Cookie Fun** and **Arbitrum** tracks, we leverage the ElizaOS starter repository to develop a custom auto-trading plugin. Our solution enables automated trading on EVM-compatible blockchains like **BASE** and **ARBITRUM**, integrating real-time on-chain data, sentiment analysis, and advanced trading logic to optimize decision-making in decentralized finance.
 
 The AI automatically buys and sells tokens based on predefined trading signals, leveraging market trends, liquidity analysis, and AI-driven sentiment evaluation to maximize profitability while managing risk.
 
-Buys and sells are tweetet in a regularly. Additionally, a bull post engine gives deep insights regarding the current AI token market.
+Buy and sell transactions are automatically posted and discussed on X. Additionally, a transaction-independent X engine gives deep insights regarding the current AI token market.
 
 ## Installation
 
@@ -204,17 +204,17 @@ The `analyzeData` function is a critical component of the `cookie-fun` plugin, r
 
 ## Trading Strategy
 
-The system follows a **data-driven approach** to determine buy signals. The decision-making process involves multiple steps:
+The system follows a data-driven approach to determine buy signals. The decision-making process involves multiple steps:
 
 ### 1. **Market Data Collection**
 
-- The system queries **marketdata key metrics** for token price, liquidity, trading volume, and holders count.
+- The system queries key metrics for token price, liquidity, trading volume, and holder count.
 
 ### 2. **Social Sentiment Analysis via Cookie.fun API**
 
-- The system retrieves tweets mentioning the token over the past 24 hours.
+- The system retrieves a token's mindshare and tweets mentioning the token over the past 24 hours.
 - If no relevant tweets are found, the token is not considered for trading.
-- If tweets are found, the system conducts sentiment analysis.
+- If tweets are found, the system conducts a sentiment analysis.
 
 ### 3. **Buy Signal Evaluation**
 
@@ -222,9 +222,9 @@ The decision to buy a token is based on the following key metrics:
 
 | Metric              | Description                                                               |
 | ------------------- | ------------------------------------------------------------------------- |
-| **Mindshare**       | The number of relevant tweets mentioning the token                        |
+| **Mindshare**       | Tracks the popularity and discussion around AI Agent (tokens)             |
 | **Liquidity**       | Ensures that the token has sufficient liquidity for trading               |
-| **24H Volume**      | Measures the trading activity over the last 24 hours                      |
+| **24H Volume**      | Measures the trading volume over the last 24 hours                        |
 | **Holders Count**   | Checks the number of unique wallet addresses holding the token            |
 | **Price Momentum**  | Detects price trends and volatility                                       |
 | **Social Momentum** | Evaluates the trend of social media engagement                            |
@@ -232,10 +232,10 @@ The decision to buy a token is based on the following key metrics:
 
 A token is assigned a **buy signal** if it meets the following criteria:
 
-- **High social media engagement** (mindshare)
-- **Healthy liquidity and trading volume**
-- **Strong price momentum indicating upward movement**
-- **Final sentiment check on Tweets via LLM**
+- **Higher social media coverage (mindshare)**
+- **Sufficient liquidity and trading volume**
+- **Strong price momentum**
+- **Latest tweets confirm a positive sentiment (LLM-based)**
 
 ### 4. **Database Update and Signal Storage**
 

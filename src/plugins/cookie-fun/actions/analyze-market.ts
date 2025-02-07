@@ -12,6 +12,7 @@ import type { TokenMetrics } from "../types/TokenMetrics.ts";
 import { CookieApiProvider } from "../providers/cookie-api-provider.ts";
 import { DexscreenerProvider } from "../providers/dexscreener-provider.ts";
 import { TokenMetricsProvider } from "../providers/token-metrics-provider-psql.ts";
+import { CoinbaseProvider } from "../providers/coinbase-provider.ts";
 
 export const analyzeMarket: Action = {
   name: "ANALYZE_MARKET",
@@ -77,9 +78,28 @@ export const analyzeMarket: Action = {
           contract.contractAddress
         );
 
+        const coinbaseProvider = new CoinbaseProvider();
+
+        const usdPrice = await coinbaseProvider.fetchEthUsdPrice();
+
+        elizaLogger.log("USD: ", usdPrice);
+
+        if (!dexData) {
+          elizaLogger.log(
+            `❌ No data found for ${agent.agentName} - skipping analysis.`
+          );
+          continue;
+        }
+
+        const priceInEth = dexData.price
+          ? Number(dexData.price) // ✅ DexScreener gibt ETH-Preis direkt aus
+          : agent.price && usdPrice
+          ? Number(agent.price) / usdPrice // ✅ Falls Preis in USD → Umrechnen in ETH
+          : 0; // ❌ Falls alles fehlschlägt → Fallback auf 0
+
         // ✅ **Hier sicherstellen, dass die Werte aus dem Backend korrekt sind**
         const currentMetrics = {
-          price: Number(agent.price) || Number(dexData.price),
+          price: Number(dexData.price) || priceInEth,
           volume_24h: Number(agent.volume24Hours) || Number(dexData.volume),
           mindshare: Number(agent.mindshare),
           liquidity: Number(agent.liquidity) || Number(dexData.liquidit) || 0,
